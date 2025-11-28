@@ -7,7 +7,7 @@ export const Logo = () => (
     width={0}
     height={0}
     sizes="100vw"
-    style={{ width: "145px", height: "auto" }}
+    style={{ width: "150px", height: "auto" }}
     priority
   />
 );

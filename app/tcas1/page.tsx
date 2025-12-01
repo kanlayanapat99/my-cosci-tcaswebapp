@@ -2,6 +2,15 @@
 
 import { useState, useEffect } from "react";
 import TableTCAS from "./components/tc1_table";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/customized/select/select";
 
 type YearItem = { year: string };
 
@@ -20,18 +29,27 @@ export default function Page() {
   }, []);
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center gap-12">
+    <div className="p-10 space-y-6">
+      <div className="flex items-center gap-10">
         <h1 className="text-2xl font-bold">TCAS1</h1>
-        <select
-          className="border p-2 rounded"
-          value={year}
-          onChange={(e) => setYear(e.target.value)}
-        >
-          {yearList.map((y) => (
-            <option key={y} value={y}>{y}</option>
-          ))}
-        </select>
+
+        <div className="w-36">
+          <Select value={year} onValueChange={(val) => setYear(val)}>
+            <SelectTrigger className="rounded-full">
+              <SelectValue placeholder="Select year" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectLabel>Year</SelectLabel>
+                {yearList.map((y) => (
+                  <SelectItem key={y} value={y}>
+                    {y}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {year && <TableTCAS year={year} />}

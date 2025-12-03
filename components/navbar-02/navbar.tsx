@@ -18,9 +18,11 @@ const Navbar = () => {
         </div>
 
         <div className="flex items-center gap-3">
+          <Link href="/admin">
           <Button variant="outline" className="hidden sm:inline-flex">
-            Sign In
+            Upload
           </Button>
+          </Link>
 
           {/* Mobile Menu */}
           <div className="md:hidden">

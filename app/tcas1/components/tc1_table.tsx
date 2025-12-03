@@ -54,7 +54,6 @@ export default function TableTCAS1({ year }: TableTCASProps) {
   };
 
   useEffect(() => {
-    // โหลดข้อมูลและฟอนต์พร้อมกัน
     const url = year ? `/api/tcas_1?year=${year}` : "/api/tcas_1";
     
     Promise.all([

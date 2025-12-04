@@ -42,6 +42,8 @@ export async function PUT(req, context) {
       major,
       quota,
       applicants,
+      interview_eligible,
+      interview_attended,
       qualified,
       confirmed,
       registered,
@@ -58,7 +60,7 @@ export async function PUT(req, context) {
     // Update row
     await db.query(
       `UPDATE ${table}
-       SET year = ?, major = ?, quota = ?, applicants = ?, qualified = ?, confirmed = ?, registered = ?
+       SET year = ?, major = ?, quota = ?, applicants = ?, interview_eiligible = ?, interview_attended = ?, qualified = ?, confirmed = ?, registered = ?
        WHERE id = ?`,
       [
         year,

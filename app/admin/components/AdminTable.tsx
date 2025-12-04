@@ -26,9 +26,9 @@ export type TCASRow = {
   major: string;
   quota: number | null;
   applicants: number | null;
+  interview_eligible: number | null;
+  interview_attended: number | null;
   qualified: number | null;
-  interviewed: number | null;
-  selected: number | null;
   confirmed: number | null;
   registered: number | null;
 };
@@ -126,12 +126,12 @@ export default function AdminTable({ apiPath }: AdminTableProps) {
         <Table>
           <TableHeader>
             <TableRow className="bg-gray-200 text-center">
-              <TableHead>เอก</TableHead>
+              <TableHead>สาขา / วิชาเอก</TableHead>
               <TableHead>จำนวนรับ</TableHead>
               <TableHead>ผู้สมัคร</TableHead>
               <TableHead>มีสิทธิ์สัมภาษณ์</TableHead>
               <TableHead>เข้าสัมภาษณ์</TableHead>
-              <TableHead>ผ่านคัดเลือก</TableHead>
+              <TableHead>ผ่านการคัดเลือก</TableHead>
               <TableHead>ยืนยันสิทธิ์</TableHead>
               <TableHead>รายงานตัว</TableHead>
               <TableHead></TableHead>
@@ -144,9 +144,9 @@ export default function AdminTable({ apiPath }: AdminTableProps) {
                 <TableCell>{r.major}</TableCell>
                 <TableCell>{r.quota ?? "-"}</TableCell>
                 <TableCell>{r.applicants ?? "-"}</TableCell>
+                <TableCell>{r.interview_eligible ?? "-"}</TableCell>
+                <TableCell>{r.interview_attended ?? "-"}</TableCell>
                 <TableCell>{r.qualified ?? "-"}</TableCell>
-                <TableCell>{r.interviewed ?? "-"}</TableCell>
-                <TableCell>{r.selected ?? "-"}</TableCell>
                 <TableCell>{r.confirmed ?? "-"}</TableCell>
                 <TableCell>{r.registered ?? "-"}</TableCell>
 
@@ -168,11 +168,11 @@ export default function AdminTable({ apiPath }: AdminTableProps) {
                         <input className="border p-2 rounded-lg w-full bg-gray-100 cursor-not-allowed" value={r.major} readOnly />
 
                         <div className="grid grid-cols-2 gap-3">
-                          <input className="border p-2 rounded-lg" type="text" value={r.quota ?? ""} onChange={(e) => onEdit(i, "quota", parseNumberOrNull(e.target.value))} />
-                          <input className="border p-2 rounded-lg" type="text" value={r.applicants ?? ""} onChange={(e) => onEdit(i, "applicants", parseNumberOrNull(e.target.value))} />
-                          <input className="border p-2 rounded-lg" type="text" placeholder="มีสิทธิ์สัมภาษณ์" value={r.qualified ?? ""} onChange={(e) => onEdit(i, "qualified", parseNumberOrNull(e.target.value))} />
-                          <input className="border p-2 rounded-lg" type="text" placeholder="เข้าสัมภาษณ์" value={r.interviewed ?? ""} onChange={(e) => onEdit(i, "interviewed", parseNumberOrNull(e.target.value))} />
-                          <input className="border p-2 rounded-lg" type="text" placeholder="ผ่านคัดเลือก" value={r.selected ?? ""} onChange={(e) => onEdit(i, "selected", parseNumberOrNull(e.target.value))} />
+                          <input className="border p-2 rounded-lg" type="text" placeholder="จำนวนรับ" value={r.quota ?? ""} onChange={(e) => onEdit(i, "quota", parseNumberOrNull(e.target.value))} />
+                          <input className="border p-2 rounded-lg" type="text" placeholder="ผู้สมัคร" value={r.applicants ?? ""} onChange={(e) => onEdit(i, "applicants", parseNumberOrNull(e.target.value))} />
+                          <input className="border p-2 rounded-lg" type="text" placeholder="มีสิทธิ์สัมภาษณ์" value={r.interview_eligible ?? ""} onChange={(e) => onEdit(i, "interview_eligible", parseNumberOrNull(e.target.value))} />
+                          <input className="border p-2 rounded-lg" type="text" placeholder="เข้าสัมภาษณ์" value={r.interview_attended ?? ""} onChange={(e) => onEdit(i, "interview_attended", parseNumberOrNull(e.target.value))} />
+                          <input className="border p-2 rounded-lg" type="text" placeholder="ผ่านการคัดเลือก" value={r.qualified ?? ""} onChange={(e) => onEdit(i, "qualified", parseNumberOrNull(e.target.value))} />
                           <input className="border p-2 rounded-lg" type="text" placeholder="ยืนยันสิทธิ์" value={r.confirmed ?? ""} onChange={(e) => onEdit(i, "confirmed", parseNumberOrNull(e.target.value))} />
                           <input className="border p-2 rounded-lg" type="text" placeholder="รายงานตัว" value={r.registered ?? ""} onChange={(e) => onEdit(i, "registered", parseNumberOrNull(e.target.value))} />
                         </div>
@@ -194,17 +194,24 @@ export default function AdminTable({ apiPath }: AdminTableProps) {
       <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
         <DialogContent className="rounded-xl max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-center">คุณยังไม่ได้บันทึกข้อมูล</DialogTitle>
+            <DialogTitle className="text-center">Unsaved Changes</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 text-center">
-            <p>คุณต้องการบันทึกก่อนออกหรือไม่?</p>
-            <div className="flex justify-around gap-2">
-              <Button onClick={() => handleConfirmBack(true)} className="bg-blue-500 hover:bg-blue-600 text-white">
-                Save & Back
+            <p>Do you want to save your changes before leaving?</p>
+            <div className="flex justify-center gap-2">
+              <Button 
+                onClick={() => handleConfirmBack(true)} 
+                className="bg-blue-500 hover:bg-blue-600 text-white min-w-24"
+              >
+                Save & Leave
               </Button>
-              <Button onClick={() => handleConfirmBack(false)} variant="outline">
-                Discard & Back
+              <Button 
+                onClick={() => handleConfirmBack(false)} 
+                variant="outline"
+                className="min-w-24"
+              >
+                Discard
               </Button>
             </div>
           </div>

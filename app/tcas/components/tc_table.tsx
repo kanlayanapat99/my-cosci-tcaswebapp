@@ -22,13 +22,13 @@ type TCASRow = {
   id: string;
   year: string;
   major: string;
-  quota: number;
-  applicants: number;
+  quota: number | null;
+  applicants: number | null;
   interview_eligible?: number | null;
   interview_attended?: number | null;
-  qualified: number;
-  confirmed: number;
-  registered: number;
+  qualified: number | null;
+  confirmed: number | null;
+  registered: number | null;
 };
 
 export default function TableTCAS({ table, year }: TableTCASProps) {
@@ -38,21 +38,37 @@ export default function TableTCAS({ table, year }: TableTCASProps) {
   // ฟังก์ชันช่วยแปลงค่า null/undefined เป็น "-"
   const formatValue = (val: number | string | null | undefined) => val ?? "-";
 
-  // คำนวณแถวรวม
-  const totalRow = {
-    major: "รวม",
-    quota: rows.reduce((sum, r) => sum + (r.quota ?? 0), 0),
-    applicants: rows.reduce((sum, r) => sum + (r.applicants ?? 0), 0),
-    interview_eligible: rows.some(r => r.interview_eligible === null || r.interview_eligible === undefined)
-      ? "-" 
-      : rows.reduce((sum, r) => sum + (r.interview_eligible ?? 0), 0),
-    interview_attended: rows.some(r => r.interview_attended === null || r.interview_attended === undefined)
-      ? "-" 
-      : rows.reduce((sum, r) => sum + (r.interview_attended ?? 0), 0),
-    qualified: rows.reduce((sum, r) => sum + (r.qualified ?? 0), 0),
-    confirmed: rows.reduce((sum, r) => sum + (r.confirmed ?? 0), 0),
-    registered: rows.reduce((sum, r) => sum + (r.registered ?? 0), 0),
-  };
+  const calculateAndFormat = (rows: TCASRow[], key: keyof TCASRow) => {
+    const sum = rows.reduce((total, r) => {
+        const value = r[key];
+        // ตรวจสอบ type ก่อนใช้งาน
+        if (typeof value === 'number') {
+        return total + value;
+        }
+        return total + 0; // ถ้าเป็น null หรือ undefined ให้เป็น 0
+    }, 0);
+    
+    // ถ้าผลรวมเป็น 0 และทุกค่าเป็น null/undefined ให้เป็น "-"
+    if (sum === 0 && rows.every(r => {
+        const value = r[key];
+        return value === null || value === undefined;
+    })) {
+        return "-";
+    }
+    return sum;
+    };
+
+    // ใช้กับทุกคอลัมน์
+        const totalRow = {
+        major: "รวม",
+        quota: calculateAndFormat(rows, "quota"),
+        applicants: calculateAndFormat(rows, "applicants"),
+        interview_eligible: calculateAndFormat(rows, "interview_eligible"),
+        interview_attended: calculateAndFormat(rows, "interview_attended"),
+        qualified: calculateAndFormat(rows, "qualified"),
+        confirmed: calculateAndFormat(rows, "confirmed"),
+        registered: calculateAndFormat(rows, "registered"),
+        };
 
   useEffect(() => {
     const url = year ? `/api/tcas/${table}?year=${year}` : `/api/tcas/${table}`;

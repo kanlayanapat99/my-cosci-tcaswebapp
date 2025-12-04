@@ -1,3 +1,5 @@
+"use client";
+
 import {
   NavigationMenu,
   NavigationMenuItem,
@@ -8,6 +10,7 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ComponentProps } from "react";
+import { motion } from "framer-motion";
 
 const tcasOptions = [
   { value: "tcas_1", label: "TCAS1" },
@@ -19,44 +22,37 @@ const tcasOptions = [
 export const NavMenu = (props: ComponentProps<typeof NavigationMenu>) => {
   const pathname = usePathname();
   
-  // ตรวจสอบว่า pathname ตรงกับ TCAS route ไหน
   const getIsActive = (tableValue: string) => {
-    // กรณีที่เป็น dynamic route /tcas/[table]
-    if (pathname.startsWith(`/tcas/${tableValue}`)) {
-      return true;
-    }
-    
-    // กรณีที่เป็น route เก่า /tcas1, /tcas2, /tcas3, /tcas4
-    // ตรวจสอบชื่อ table กับ pathname
-    const tableNumber = tableValue.split('_')[1]; // ได้ "1", "2", "3", "4"
-    if (pathname === `/tcas${tableNumber}` || pathname.startsWith(`/tcas${tableNumber}/`)) {
-      return true;
-    }
-    
-    return false;
+    return pathname.startsWith(`/tcas/${tableValue}`);
   };
 
   return (
     <NavigationMenu {...props}>
       <NavigationMenuList className="data-[orientation=vertical]:-ms-2 data-[orientation=vertical]:flex-col data-[orientation=vertical]:items-start data-[orientation=vertical]:justify-start">
-        {tcasOptions.map((option) => {
+        {tcasOptions.map((option, index) => {
           const isActive = getIsActive(option.value);
-          
-          // ใช้ dynamic route สำหรับลิงก์ใหม่
           const href = `/tcas/${option.value}`;
           
           return (
             <NavigationMenuItem key={option.value}>
-              <NavigationMenuLink asChild>
-                <Link 
-                  href={href}
-                  className={`${navigationMenuTriggerStyle()} ${
-                    isActive ? "bg-accent text-accent-foreground" : ""
-                  }`}
-                >
-                  {option.label}
-                </Link>
-              </NavigationMenuLink>
+              <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <NavigationMenuLink asChild>
+                  <Link 
+                    href={href}
+                    className={`${navigationMenuTriggerStyle()} ${
+                      isActive ? "bg-accent text-accent-foreground" : ""
+                    }`}
+                  >
+                    {option.label}
+                  </Link>
+                </NavigationMenuLink>
+              </motion.div>
             </NavigationMenuItem>
           );
         })}

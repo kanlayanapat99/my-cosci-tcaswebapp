@@ -1,4 +1,3 @@
-// app/api/tables/route.js
 import { NextResponse } from 'next/server';
 import { db } from "@/lib/db";
 

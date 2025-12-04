@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import TableTCAS from "../components/tc_table";
+import PageTransition from "@/components/ui/pageTransition";
 import {
   Select,
   SelectContent,
@@ -34,6 +35,7 @@ export default function Page() {
   const displayName = table.toUpperCase().replace('_', ' ');
 
   return (
+    <PageTransition>
     <div className="p-10 space-y-6">
       <div className="flex items-center gap-10">
         <h1 className="text-2xl font-bold">{displayName}</h1>
@@ -59,5 +61,6 @@ export default function Page() {
 
       {year && <TableTCAS table={table} year={year} />}
     </div>
+    </PageTransition>
   );
 }

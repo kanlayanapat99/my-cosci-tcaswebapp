@@ -53,7 +53,8 @@ export default function AdminDashboard() {
 
       for (const table of tcasTables) {
         try {
-          const res = await fetch(`/api/${table}/years`);
+          // เปลี่ยน API endpoint ตามโครงสร้างใหม่
+          const res = await fetch(`/api/tcas/${table}/years`);
           if (res.ok) {
             const yearsData = await res.json();
             const years = yearsData.map((y: { year: string }) =>
@@ -112,13 +113,14 @@ export default function AdminDashboard() {
       setYear("");
       setErrorMessage("");
       
-      // รีเฟรชข้อมูล
+      // รีเฟรชข้อมูล - ใช้ API endpoint ใหม่
       const tcasTables = ["tcas_1", "tcas_2", "tcas_3", "tcas_4"];
       const updatedCards: Summary[] = [];
       
       for (const table of tcasTables) {
         try {
-          const res = await fetch(`/api/${table}/years`);
+          // เปลี่ยน API endpoint ตามโครงสร้างใหม่
+          const res = await fetch(`/api/tcas/${table}/years`);
           if (res.ok) {
             const yearsData = await res.json();
             const years = yearsData.map((y: { year: string }) =>
@@ -134,7 +136,7 @@ export default function AdminDashboard() {
       setSummaries(updatedCards);
       
       // Redirect ไปยังหน้าแก้ไขตารางที่สร้างใหม่
-      router.push(`/admin/tcas_${round}/${year}`);
+      router.push(`/admin/${data.table}/${data.year}`);
       
     } catch (error: unknown) {
       console.error('Error creating table:', error);

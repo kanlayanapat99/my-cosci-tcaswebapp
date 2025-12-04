@@ -1,4 +1,3 @@
-// app/admin/page.tsx (หรือ .jsx)
 "use client";
 
 import { useState, useEffect } from "react";
@@ -25,6 +24,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { Alert, AlertDescription, AlertTitle } from "@/components/customized/alert/alert";
+import { OctagonAlertIcon } from "lucide-react";
 
 type Summary = {
   table: string;
@@ -41,6 +42,9 @@ export default function AdminDashboard() {
   const [round, setRound] = useState("");
   const [year, setYear] = useState("");
   const [loading, setLoading] = useState(false);
+  
+  // State สำหรับ error message
+  const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     async function load() {
@@ -68,92 +72,97 @@ export default function AdminDashboard() {
   }, []);
 
   const handleAddTable = async () => {
-  if (!round || !year) {
-    toast.error("Select TCAS round and enter year");
-    return;
-  }
+    // รีเซ็ต error message ก่อนเริ่มทำงานใหม่
+    setErrorMessage("");
 
-  if (!/^\d{4}$/.test(year)) {
-    toast.error("Year must be a 4-digit number");
-    return;
-  }
-
-  setLoading(true);
-  try {
-    const response = await fetch('/api/tables', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ round, year }),
-    });
-
-    const data = await response.json();
-
-    // ใน handleAddTable แก้ไขส่วนที่จัดการ error:
-    if (!response.ok) {
-      // ใช้ toast.warning แทน toast.error สำหรับกรณีที่ข้อมูลซ้ำ
-      if (data.error?.includes('already exists')) {
-        toast.warning(data.error, {
-          duration: 5000,
-          style: {
-            background: '#fef3c7',
-            color: '#92400e',
-            border: '1px solid #f59e0b',
-          },
-        });
-      } else {
-        toast.error(data.error || 'Error creating table');
-      }
-      setLoading(false);
+    if (!round || !year) {
+      setErrorMessage("Select TCAS round and enter year");
       return;
     }
 
-    toast.success(`Create new table TCAS${round} ${year} successfully`);
-    
-    // ปิด Dialog
-    setOpen(false);
-    setRound("");
-    setYear("");
-    
-    // รีเฟรชข้อมูล
-    const tcasTables = ["tcas_1", "tcas_2", "tcas_3", "tcas_4"];
-    const updatedCards: Summary[] = [];
-    
-    for (const table of tcasTables) {
-      try {
-        const res = await fetch(`/api/${table}/years`);
-        if (res.ok) {
-          const yearsData = await res.json();
-          const years = yearsData.map((y: { year: string }) =>
-            String(y.year).trim()
-          );
-          updatedCards.push({ table, years });
-        }
-      } catch (fetchError: unknown) {
-        console.error(`Error loading ${table}:`, fetchError);
+    if (!/^\d{4}$/.test(year)) {
+      setErrorMessage("Year must be a 4-digit number");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch('/api/tables', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ round, year }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        // แสดง error ใน Alert
+        setErrorMessage(data.error || 'Error creating table');
+        setLoading(false);
+        return;
       }
+
+      toast.success(`Create new table TCAS${round} ${year} successfully`);
+      
+      // ปิด Dialog และรีเซ็ตค่าทั้งหมด
+      setOpen(false);
+      setRound("");
+      setYear("");
+      setErrorMessage("");
+      
+      // รีเฟรชข้อมูล
+      const tcasTables = ["tcas_1", "tcas_2", "tcas_3", "tcas_4"];
+      const updatedCards: Summary[] = [];
+      
+      for (const table of tcasTables) {
+        try {
+          const res = await fetch(`/api/${table}/years`);
+          if (res.ok) {
+            const yearsData = await res.json();
+            const years = yearsData.map((y: { year: string }) =>
+              String(y.year).trim()
+            );
+            updatedCards.push({ table, years });
+          }
+        } catch (fetchError: unknown) {
+          console.error(`Error loading ${table}:`, fetchError);
+        }
+      }
+      
+      setSummaries(updatedCards);
+      
+      // Redirect ไปยังหน้าแก้ไขตารางที่สร้างใหม่
+      router.push(`/admin/tcas_${round}/${year}`);
+      
+    } catch (error: unknown) {
+      console.error('Error creating table:', error);
+      
+      // แสดง network error ใน Alert
+      if (error instanceof Error) {
+        setErrorMessage(error.message);
+      } else if (typeof error === 'string') {
+        setErrorMessage(error);
+      } else {
+        setErrorMessage('An unknown error occurred');
+      }
+    } finally {
+      setLoading(false);
     }
-    
-    setSummaries(updatedCards);
-    
-    // Redirect ไปยังหน้าแก้ไขตารางที่สร้างใหม่
-    router.push(`/admin/tcas_${round}/${year}`);
-    
-  } catch (error: unknown) {
-    console.error('Error creating table:', error);
-    
-    if (error instanceof Error) {
-      toast.error(error.message);
-    } else if (typeof error === 'string') {
-      toast.error(error);
-    } else {
-      toast.error('An unknown error occurred');
+  };
+
+  // เมื่อปิด Dialog ให้รีเซ็ตทุกอย่าง
+  const handleDialogOpenChange = (isOpen: boolean) => {
+    setOpen(isOpen);
+    if (!isOpen) {
+      // รีเซ็ตค่าทั้งหมดเมื่อปิด Dialog
+      setRound("");
+      setYear("");
+      setErrorMessage("");
+      setLoading(false);
     }
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const filtered = summaries.filter((s) => {
     const matchRound =
@@ -217,7 +226,7 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid grid-cols-4 gap-4">
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={handleDialogOpenChange}>
           <DialogTrigger asChild>
             <div className="w-full h-40 flex items-center justify-center border-2 border-dashed rounded-md cursor-pointer hover:bg-gray-50 transition-colors">
               <div className="text-center">
@@ -233,9 +242,26 @@ export default function AdminDashboard() {
             </DialogHeader>
 
             <div className="space-y-4 py-4">
+              {/* แสดง Alert เมื่อมี error */}
+              {errorMessage && (
+                <Alert variant="destructive" className="mb-4">
+                  <OctagonAlertIcon className="size-4" />
+                  <AlertTitle>Error</AlertTitle>
+                  <AlertDescription>
+                    {errorMessage}
+                  </AlertDescription>
+                </Alert>
+              )}
+
               <div>
                 <Label htmlFor="round">TCAS Round</Label>
-                <Select value={round} onValueChange={setRound}>
+                <Select 
+                  value={round} 
+                  onValueChange={(value) => {
+                    setRound(value);
+                    setErrorMessage(""); // ล้าง error เมื่อผู้ใช้แก้ไขข้อมูล
+                  }}
+                >
                   <SelectTrigger className="mt-1">
                     <SelectValue placeholder="Select round" />
                   </SelectTrigger>
@@ -258,7 +284,10 @@ export default function AdminDashboard() {
                   type="number"
                   placeholder="เช่น 2567"
                   value={year}
-                  onChange={(e) => setYear(e.target.value)}
+                  onChange={(e) => {
+                    setYear(e.target.value);
+                    setErrorMessage(""); // ล้าง error เมื่อผู้ใช้แก้ไขข้อมูล
+                  }}
                   className="mt-1"
                 />
                 <p className="text-xs text-gray-500 mt-1">

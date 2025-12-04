@@ -20,7 +20,7 @@ const Navbar = () => {
         <div className="flex items-center gap-3">
           <Link href="/admin">
           <Button variant="outline" className="hidden sm:inline-flex">
-            Upload
+            Admin
           </Button>
           </Link>
 

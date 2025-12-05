@@ -9,7 +9,7 @@ const pageVariants = {
     y: 20,
   },
   animate: {
-    opacity: 1,
+    opacity: 5,
     y: 0,
   },
   exit: {
@@ -32,7 +32,7 @@ export default function PageTransition({ children }: { children: React.ReactNode
         type: "spring",
         stiffness: 100,
         damping: 20,
-        duration: 0.3,
+        duration: 1.0,
       }}
     >
       {children}

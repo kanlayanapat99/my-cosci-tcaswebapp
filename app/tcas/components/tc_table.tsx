@@ -12,6 +12,7 @@ import {
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Button } from "@/components/ui/button";
+import { Download } from "lucide-react";
 
 type TableTCASProps = {
   table: string; // เช่น "tcas_1", "tcas_2"
@@ -162,6 +163,22 @@ export default function TableTCAS({ table, year }: TableTCASProps) {
 
   return (
     <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-semibold">Table {table.toUpperCase().replace('_', ' ')}</h2>
+        <div className="flex items-center gap-4">
+          <Button 
+            onClick={exportPDF} 
+            variant="outline" 
+            size="sm"
+            className="gap-2 hover:bg-blue-300"
+            disabled={!fontBase64}
+          >
+            <Download className="h-4 w-4" />
+            {fontBase64 ? "Export Table as PDF" : "กำลังโหลดฟอนต์..."}
+          </Button>
+        </div>
+      </div>
+
       <div className="w-full border rounded-md overflow-hidden">
         <Table>
           <TableHeader>
@@ -202,16 +219,6 @@ export default function TableTCAS({ table, year }: TableTCASProps) {
             </TableRow>
           </TableBody>
         </Table>
-      </div>
-
-      <div className="flex justify-end">
-        <Button
-          onClick={exportPDF}
-          className="px-4 py-2 bg-blue-400 text-black rounded shadow hover:bg-blue-500"
-          disabled={!fontBase64}
-        >
-          {fontBase64 ? "Export Table as PDF" : "กำลังโหลดฟอนต์..."}
-        </Button>
       </div>
     </div>
   );

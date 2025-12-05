@@ -31,6 +31,7 @@ export async function GET(req, context) {
   }
 }
 
+//PUT
 export async function PUT(req, context) {
   try {
     const { params } = context;
@@ -60,16 +61,18 @@ export async function PUT(req, context) {
     // Update row
     await db.query(
       `UPDATE ${table}
-       SET year = ?, major = ?, quota = ?, applicants = ?, interview_eiligible = ?, interview_attended = ?, qualified = ?, confirmed = ?, registered = ?
+       SET year = ?, major = ?, quota = ?, applicants = ?, interview_eligible = ?, interview_attended = ?, qualified = ?, confirmed = ?, registered = ?
        WHERE id = ?`,
       [
-        year,
-        major,
-        quota,
-        applicants,
-        qualified,
-        confirmed,
-        registered,
+        year || null,
+        major || null,
+        quota || null,
+        applicants || null,
+        interview_eligible || null,
+        interview_attended || null,
+        qualified || null,
+        confirmed || null,
+        registered || null,
         id
       ]
     );

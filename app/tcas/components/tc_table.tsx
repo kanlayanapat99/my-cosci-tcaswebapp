@@ -15,8 +15,9 @@ import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
 
 type TableTCASProps = {
-  table: string; // เช่น "tcas_1", "tcas_2"
-  year?: string;
+  table: string;
+  years: string[];
+  major?: string;
 };
 
 type TCASRow = {
@@ -32,47 +33,74 @@ type TCASRow = {
   registered: number | null;
 };
 
-export default function TableTCAS({ table, year }: TableTCASProps) {
+// Extend jsPDF type to include autoTable
+interface JsPDFWithAutoTable extends jsPDF {
+  lastAutoTable?: {
+    finalY: number;
+  };
+  autoTable?: (options: any) => JsPDFWithAutoTable;
+}
+
+export default function TableTCAS({ table, years, major = "all" }: TableTCASProps) {
   const [rows, setRows] = useState<TCASRow[]>([]);
   const [fontBase64, setFontBase64] = useState<string>("");
 
-  // ฟังก์ชันช่วยแปลงค่า null/undefined เป็น "-"
   const formatValue = (val: number | string | null | undefined) => val ?? "-";
 
   const calculateAndFormat = (rows: TCASRow[], key: keyof TCASRow) => {
     const sum = rows.reduce((total, r) => {
-        const value = r[key];
-        // ตรวจสอบ type ก่อนใช้งาน
-        if (typeof value === 'number') {
+      const value = r[key];
+      if (typeof value === 'number') {
         return total + value;
-        }
-        return total + 0; // ถ้าเป็น null หรือ undefined ให้เป็น 0
+      }
+      return total + 0;
     }, 0);
     
-    // ถ้าผลรวมเป็น 0 และทุกค่าเป็น null/undefined ให้เป็น "-"
     if (sum === 0 && rows.every(r => {
-        const value = r[key];
-        return value === null || value === undefined;
+      const value = r[key];
+      return value === null || value === undefined;
     })) {
-        return "-";
+      return "-";
     }
     return sum;
-    };
+  };
 
-    // ใช้กับทุกคอลัมน์
-        const totalRow = {
-        major: "รวม",
-        quota: calculateAndFormat(rows, "quota"),
-        applicants: calculateAndFormat(rows, "applicants"),
-        interview_eligible: calculateAndFormat(rows, "interview_eligible"),
-        interview_attended: calculateAndFormat(rows, "interview_attended"),
-        qualified: calculateAndFormat(rows, "qualified"),
-        confirmed: calculateAndFormat(rows, "confirmed"),
-        registered: calculateAndFormat(rows, "registered"),
-        };
+  // Group by year for summary
+  const groupByYear = rows.reduce((acc, row) => {
+    if (!acc[row.year]) {
+      acc[row.year] = [];
+    }
+    acc[row.year].push(row);
+    return acc;
+  }, {} as Record<string, TCASRow[]>);
+
+  // Calculate totals per year
+  const yearlyTotals = Object.entries(groupByYear).map(([year, yearRows]) => ({
+    year,
+    quota: calculateAndFormat(yearRows, "quota"),
+    applicants: calculateAndFormat(yearRows, "applicants"),
+    interview_eligible: calculateAndFormat(yearRows, "interview_eligible"),
+    interview_attended: calculateAndFormat(yearRows, "interview_attended"),
+    qualified: calculateAndFormat(yearRows, "qualified"),
+    confirmed: calculateAndFormat(yearRows, "confirmed"),
+    registered: calculateAndFormat(yearRows, "registered"),
+  }));
+
+  // Calculate grand totals
+  const totalRow = {
+    major: "รวมทั้งหมด",
+    quota: calculateAndFormat(rows, "quota"),
+    applicants: calculateAndFormat(rows, "applicants"),
+    interview_eligible: calculateAndFormat(rows, "interview_eligible"),
+    interview_attended: calculateAndFormat(rows, "interview_attended"),
+    qualified: calculateAndFormat(rows, "qualified"),
+    confirmed: calculateAndFormat(rows, "confirmed"),
+    registered: calculateAndFormat(rows, "registered"),
+  };
 
   useEffect(() => {
-    const url = year ? `/api/tcas/${table}?year=${year}` : `/api/tcas/${table}`;
+    const yearsParam = years.join(',');
+    const url = `/api/tcas/${table}?years=${yearsParam}${major !== "all" ? `&major=${major}` : ''}`;
     
     Promise.all([
       fetch(url).then(res => res.json()),
@@ -81,28 +109,37 @@ export default function TableTCAS({ table, year }: TableTCASProps) {
       setRows(data);
       setFontBase64(font);
     });
-  }, [table, year]);
+  }, [table, years, major]);
 
   const createPDFTable = (doc: jsPDF) => {
+    const pdfDoc = doc as JsPDFWithAutoTable;
+    
     if (fontBase64) {
-      doc.addFileToVFS("Sarabun-Light.ttf", fontBase64);
-      doc.addFont("Sarabun-Light.ttf", "Sarabun-Light", "normal");
-      doc.setFont("Sarabun-Light", "normal");
+      pdfDoc.addFileToVFS("Sarabun-Light.ttf", fontBase64);
+      pdfDoc.addFont("Sarabun-Light.ttf", "Sarabun-Light", "normal");
+      pdfDoc.setFont("Sarabun-Light", "normal");
     }
     
     const tableName = table.toUpperCase().replace('_', ' ');
-    doc.setFontSize(18);
-    doc.text(`รายงานสถิติ ${tableName} ปี ${year}`, 15, 45);
+    const yearsText = years.join(', ');
+    const majorText = major === "all" ? "All Majors" : major;
+    
+    pdfDoc.setFontSize(18);
+    pdfDoc.text(`รายงานสถิติ ${tableName}`, 15, 45);
+    pdfDoc.setFontSize(12);
+    pdfDoc.text(`ปีการศึกษา: ${yearsText}`, 15, 55);
+    pdfDoc.text(`สาขา: ${majorText}`, 15, 65);
 
-    autoTable(doc, {
-      startY: 55,
+    autoTable(pdfDoc, {
+      startY: 70,
       head: [[
-        "สาขา / วิชาเอก", "จำนวนรับ", "ผู้สมัคร", "มีสิทธิ์สัมภาษณ์",
+        "ปี", "สาขา", "จำนวนรับ", "ผู้สมัคร", "มีสิทธิ์สัมภาษณ์",
         "เข้าสัมภาษณ์", "ผ่านการคัดเลือก", "ยืนยันสิทธิ์", "รายงานตัว"
       ]],
       body: [
         ...rows.map(r => [
-          formatValue(r.major),
+          r.year,
+          r.major,
           formatValue(r.quota),
           formatValue(r.applicants),
           formatValue(r.interview_eligible),
@@ -112,7 +149,8 @@ export default function TableTCAS({ table, year }: TableTCASProps) {
           formatValue(r.registered)
         ]),
         [
-          formatValue(totalRow.major),
+          "รวม",
+          totalRow.major,
           formatValue(totalRow.quota),
           formatValue(totalRow.applicants),
           formatValue(totalRow.interview_eligible),
@@ -125,7 +163,7 @@ export default function TableTCAS({ table, year }: TableTCASProps) {
       theme: "grid",
       styles: {
         font: fontBase64 ? "Sarabun-Light" : "helvetica",
-        fontSize: 10,
+        fontSize: 8,
       },
       headStyles: {
         fillColor: [230, 230, 230],
@@ -135,11 +173,39 @@ export default function TableTCAS({ table, year }: TableTCASProps) {
       },
     });
 
-    doc.save(`cosci_${table}_${year}.pdf`);
+    // Add yearly summary
+    const startY = pdfDoc.lastAutoTable ? pdfDoc.lastAutoTable.finalY + 10 : 70;
+    
+    autoTable(pdfDoc, {
+      startY,
+      head: [["สรุปรายปี", "จำนวนรับ", "ผู้สมัคร", "มีสิทธิ์สัมภาษณ์", "เข้าสัมภาษณ์", "ผ่านการคัดเลือก", "ยืนยันสิทธิ์", "รายงานตัว"]],
+      body: yearlyTotals.map(t => [
+        t.year,
+        formatValue(t.quota),
+        formatValue(t.applicants),
+        formatValue(t.interview_eligible),
+        formatValue(t.interview_attended),
+        formatValue(t.qualified),
+        formatValue(t.confirmed),
+        formatValue(t.registered)
+      ]),
+      theme: "grid",
+      styles: {
+        font: fontBase64 ? "Sarabun-Light" : "helvetica",
+        fontSize: 8,
+      },
+      headStyles: {
+        fillColor: [200, 230, 200],
+        textColor: [0, 0, 0],
+      },
+    });
+
+    const filename = `cosci_${table}_${years.join('-')}_${major === "all" ? "all" : major.substring(0, 20)}.pdf`;
+    pdfDoc.save(filename);
   };
 
   const exportPDF = async () => {
-    const doc = new jsPDF({ orientation: "landscape" });
+    const doc = new jsPDF({ orientation: "landscape" }) as JsPDFWithAutoTable;
     const logo = "/Logocosci.png";
 
     try {
@@ -164,14 +230,19 @@ export default function TableTCAS({ table, year }: TableTCASProps) {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold">Table {table.toUpperCase().replace('_', ' ')}</h2>
+        <div>
+          <h2 className="text-xl font-semibold">Table {table.toUpperCase().replace('_', ' ')}</h2>
+          <p className="text-sm text-muted-foreground">
+            Years: {years.join(", ")} | Major: {major === "all" ? "All" : major}
+          </p>
+        </div>
         <div className="flex items-center gap-4">
           <Button 
             onClick={exportPDF} 
             variant="outline" 
             size="sm"
             className="gap-2 hover:bg-blue-300"
-            disabled={!fontBase64}
+            disabled={!fontBase64 || rows.length === 0}
           >
             <Download className="h-4 w-4" />
             {fontBase64 ? "Export Table as PDF" : "กำลังโหลดฟอนต์..."}
@@ -183,6 +254,7 @@ export default function TableTCAS({ table, year }: TableTCASProps) {
         <Table>
           <TableHeader>
             <TableRow className="bg-gray-300 text-center">
+              <TableHead>ปี</TableHead>
               <TableHead>สาขา / วิชาเอก</TableHead>
               <TableHead>จำนวนรับ</TableHead>
               <TableHead>จำนวนผู้สมัคร</TableHead>
@@ -196,7 +268,8 @@ export default function TableTCAS({ table, year }: TableTCASProps) {
 
           <TableBody>
             {rows.map(item => (
-              <TableRow key={item.id} className="odd:bg-muted/50">
+              <TableRow key={`${item.id}-${item.year}`} className="odd:bg-muted/50">
+                <TableCell className="font-medium">{item.year}</TableCell>
                 <TableCell>{formatValue(item.major)}</TableCell>
                 <TableCell>{formatValue(item.quota)}</TableCell>
                 <TableCell>{formatValue(item.applicants)}</TableCell>
@@ -208,7 +281,7 @@ export default function TableTCAS({ table, year }: TableTCASProps) {
               </TableRow>
             ))}
             <TableRow className="bg-gray-200 font-bold">
-              <TableCell>{formatValue(totalRow.major)}</TableCell>
+              <TableCell colSpan={2}>{formatValue(totalRow.major)}</TableCell>
               <TableCell>{formatValue(totalRow.quota)}</TableCell>
               <TableCell>{formatValue(totalRow.applicants)}</TableCell>
               <TableCell>{formatValue(totalRow.interview_eligible)}</TableCell>
@@ -220,6 +293,43 @@ export default function TableTCAS({ table, year }: TableTCASProps) {
           </TableBody>
         </Table>
       </div>
+
+      {/* Yearly Summary Table */}
+      {years.length > 1 && (
+        <div className="mt-8">
+          <h3 className="text-lg font-semibold mb-4">สรุปรายปี</h3>
+          <div className="w-full border rounded-md overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-green-100 text-center">
+                  <TableHead>ปี</TableHead>
+                  <TableHead>จำนวนรับ</TableHead>
+                  <TableHead>จำนวนผู้สมัคร</TableHead>
+                  <TableHead>มีสิทธิ์สอบสัมภาษณ์</TableHead>
+                  <TableHead>เข้าสัมภาษณ์</TableHead>
+                  <TableHead>ผ่านการคัดเลือก</TableHead>
+                  <TableHead>ยืนยันสิทธิ์</TableHead>
+                  <TableHead>รายงานตัว</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {yearlyTotals.map((yearly, index) => (
+                  <TableRow key={yearly.year} className={index % 2 === 0 ? "bg-muted/30" : ""}>
+                    <TableCell className="font-medium">{yearly.year}</TableCell>
+                    <TableCell>{formatValue(yearly.quota)}</TableCell>
+                    <TableCell>{formatValue(yearly.applicants)}</TableCell>
+                    <TableCell>{formatValue(yearly.interview_eligible)}</TableCell>
+                    <TableCell>{formatValue(yearly.interview_attended)}</TableCell>
+                    <TableCell>{formatValue(yearly.qualified)}</TableCell>
+                    <TableCell>{formatValue(yearly.confirmed)}</TableCell>
+                    <TableCell>{formatValue(yearly.registered)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -16,58 +16,51 @@ import {
   Cell,
   PieChart,
   Pie,
+  ScatterChart,
+  Scatter,
+  ZAxis,
 } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface TableRowData {
   id?: number;
-  major?: string;           // ชื่อเอก/สาขา
-  department_name?: string; // อาจใช้ชื่อนี้ในบางตาราง
-  department?: string;      // หรืออาจใช้ชื่อนี้
+  major?: string;
+  year?: string;
   applicants: number | string | null;
   qualified: number | string | null;
   registered: number | string | null;
-  year?: string;
-  faculty?: string;
-  [key: string]: string | number | null | undefined; // สำหรับ field อื่นๆ ที่อาจมี
+  quota?: number | string | null;
+  confirmed?: number | string | null;
+  interview_eligible?: number | string | null;
+  interview_attended?: number | string | null;
+  [key: string]: string | number | null | undefined;
 }
 
 interface DashboardTCASProps {
   table: string;
+  years: string[];
+  major?: string;
+}
+
+interface YearlySummary {
   year: string;
+  applicants: number;
+  qualified: number;
+  registered: number;
+  quota?: number;
+  confirmed?: number;
 }
 
-// Type สำหรับ Custom Tooltip
-interface CustomTooltipProps {
-  active?: boolean;
-  payload?: Array<{
-    name: string;
-    value: number;
-    color: string;
-    dataKey?: string;
-    payload?: Record<string, unknown>;
-  }>;
-  label?: string;
-}
-
-// Helper function ที่ทำงานกับทุกค่าได้
 const toNumber = (value: unknown): number => {
-  // ถ้าเป็น null หรือ undefined ให้เป็น 0
   if (value === null || value === undefined) return 0;
-  
-  // ถ้าเป็น string ให้แปลงเป็น number
   if (typeof value === 'string') {
-    // ลองแปลงเป็น number ถ้าสามารถแปลงได้
     const num = parseFloat(value);
     return isNaN(num) ? 0 : num;
   }
-  
-  // ถ้าเป็น number แต่เป็น NaN หรือ Infinity
   if (typeof value === 'number') {
     return isNaN(value) || !isFinite(value) ? 0 : value;
   }
-  
-  // ถ้าเป็น boolean หรือ type อื่น
   try {
     const num = Number(value);
     return isNaN(num) ? 0 : num;
@@ -76,45 +69,42 @@ const toNumber = (value: unknown): number => {
   }
 };
 
-// Helper function สำหรับ format ตัวเลข
 const formatNumber = (value: unknown): string => {
   const num = toNumber(value);
   return num.toLocaleString();
 };
 
-// Helper function สำหรับคำนวณเปอร์เซ็นต์
 const calculatePercentage = (part: unknown, total: unknown): number => {
   const partNum = toNumber(part);
   const totalNum = toNumber(total);
-  
   if (totalNum === 0) return 0;
   return Math.round((partNum / totalNum) * 100);
 };
 
-// Helper function สำหรับดึงชื่อเอก/สาขา
 const getMajorName = (row: TableRowData): string => {
-  // ลองดึงชื่อจาก field ต่างๆ ตามลำดับความสำคัญ
-  return row.major || row.department_name || row.department || `เอก ${row.id || ''}` || "ไม่มีชื่อ";
+  return row.major || `เอก ${row.id || ''}` || "ไม่มีชื่อ";
 };
 
-export default function DashboardTCAS({ table, year }: DashboardTCASProps) {
+export default function DashboardTCAS({ table, years, major = "all" }: DashboardTCASProps) {
   const [data, setData] = useState<TableRowData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("overview");
 
-  // สีสำหรับกราฟ
-  const COLORS = ['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4', '#84cc16', '#f97316', '#6366f1', '#ec4899', '#14b8a6'];
+  const COLORS = ['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4', '#84cc16', '#f97316', '#6366f1', '#ec4899'];
 
   useEffect(() => {
-    if (!table || !year) return;
+    if (!table || years.length === 0) return;
 
     const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
         
-        // ดึงข้อมูลจาก API เดียวกับตาราง
-        const response = await fetch(`/api/tcas/${table}?year=${year}`);
+        const yearsParam = years.join(',');
+        const url = `/api/tcas/${table}?years=${yearsParam}${major !== "all" ? `&major=${major}` : ''}`;
+        
+        const response = await fetch(url);
         
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -126,11 +116,7 @@ export default function DashboardTCAS({ table, year }: DashboardTCASProps) {
           throw new Error('Invalid data format received from API');
         }
 
-        // รับข้อมูลมาเลย ไม่ต้องแปลงอะไร
         setData(result);
-        
-        // Debug: ดูโครงสร้างข้อมูลที่ได้รับ
-        console.log('Dashboard data received:', result.slice(0, 1)); // แสดงแค่ record แรกเพื่อดูโครงสร้าง
         
       } catch (err) {
         console.error("Error fetching dashboard data:", err);
@@ -141,72 +127,81 @@ export default function DashboardTCAS({ table, year }: DashboardTCASProps) {
     };
 
     fetchData();
-  }, [table, year]);
+  }, [table, years, major]);
 
-  // คำนวณข้อมูลสรุปจากแถวข้อมูลทั้งหมด - ใช้ toNumber เพื่อให้ปลอดภัย
+  // Calculate overall totals
   const totalApplicants = data.reduce((sum, row) => sum + toNumber(row.applicants), 0);
   const totalQualified = data.reduce((sum, row) => sum + toNumber(row.qualified), 0);
   const totalRegistered = data.reduce((sum, row) => sum + toNumber(row.registered), 0);
+  const totalQuota = data.reduce((sum, row) => sum + toNumber(row.quota), 0);
   
-  const summaryData = {
-    applicants: totalApplicants,
-    qualified: totalQualified,
-    registered: totalRegistered,
-    registrationRate: calculatePercentage(totalRegistered, totalApplicants),
-    qualificationRate: calculatePercentage(totalQualified, totalApplicants)
-  };
+  // Calculate yearly summaries
+  const yearlySummaries = years.map(year => {
+    const yearData = data.filter(row => row.year === year);
+    return {
+      year,
+      applicants: yearData.reduce((sum, row) => sum + toNumber(row.applicants), 0),
+      qualified: yearData.reduce((sum, row) => sum + toNumber(row.qualified), 0),
+      registered: yearData.reduce((sum, row) => sum + toNumber(row.registered), 0),
+      quota: yearData.reduce((sum, row) => sum + toNumber(row.quota), 0),
+    };
+  });
 
-  // เตรียมข้อมูลสำหรับกราฟต่างๆ
-  const lineChartData = data.map(row => ({
-    name: getMajorName(row),
-    registered: toNumber(row.registered),
-    applicants: toNumber(row.applicants),
-    qualified: toNumber(row.qualified)
-  })).slice(0, 11);
+  // Prepare data for charts
+  const lineChartData = yearlySummaries.map(summary => ({
+    year: summary.year,
+    applicants: summary.applicants,
+    qualified: summary.qualified,
+    registered: summary.registered,
+  }));
 
-  const barChartData = data.map((row, index) => ({
-    name: getMajorName(row),
-    applicants: toNumber(row.applicants),
-    fill: COLORS[index % COLORS.length]
-  })).slice(0, 11);
+  // Top 10 majors by applicants
+  const topMajors = [...data]
+    .sort((a, b) => toNumber(b.applicants) - toNumber(a.applicants))
+    .slice(0, 10)
+    .map(row => ({
+      name: getMajorName(row),
+      applicants: toNumber(row.applicants),
+      year: row.year,
+      fill: COLORS[years.indexOf(row.year || '') % COLORS.length],
+    }));
 
-  // สรุปข้อมูลสำหรับ Pie Chart
-  const pieChartData = [
-    { name: "ผู้สมัคร", value: summaryData.applicants, color: "#3b82f6" },
-    { name: "ผ่านการคัดเลือก", value: summaryData.qualified, color: "#10b981" },
-    { name: "รายงานตัว", value: summaryData.registered, color: "#8b5cf6" },
-  ];
+  // Year comparison data
+  const yearComparisonData = years.map(year => {
+    const yearData = data.filter(row => row.year === year);
+    const applicants = yearData.reduce((sum, row) => sum + toNumber(row.applicants), 0);
+    const registered = yearData.reduce((sum, row) => sum + toNumber(row.registered), 0);
+    return {
+      year,
+      applicants,
+      registered,
+      registrationRate: calculatePercentage(registered, applicants),
+    };
+  });
 
-  // Custom Tooltip สำหรับกราฟ
-  const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-white p-3 border rounded shadow">
-          <p className="font-medium">{label}</p>
-          {payload.map((entry, index) => (
-            <p key={index} style={{ color: entry.color }}>
-              {entry.name}: {formatNumber(entry.value)}
-            </p>
-          ))}
-        </div>
-      );
-    }
-    return null;
-  };
+  // Major performance across years (if multiple years and specific major)
+  const majorPerformanceData = major !== "all" && years.length > 1 
+    ? years.map(year => {
+        const yearData = data.find(row => row.year === year && row.major === major);
+        return {
+          year,
+          applicants: toNumber(yearData?.applicants),
+          registered: toNumber(yearData?.registered),
+          registrationRate: calculatePercentage(yearData?.registered, yearData?.applicants),
+        };
+      }).filter(item => item.applicants > 0)
+    : [];
 
   if (loading) {
     return (
       <div className="mt-8 space-y-6">
         <Skeleton className="h-8 w-1/4" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[...Array(3)].map((_, i) => (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
             <Skeleton key={i} className="h-32 rounded-lg" />
           ))}
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Skeleton className="h-80 rounded-lg" />
-          <Skeleton className="h-80 rounded-lg" />
-        </div>
+        <Skeleton className="h-80 rounded-lg" />
       </div>
     );
   }
@@ -215,7 +210,6 @@ export default function DashboardTCAS({ table, year }: DashboardTCASProps) {
     return (
       <div className="mt-8 p-8 text-center border rounded-lg bg-red-50">
         <p className="text-red-600">เกิดข้อผิดพลาด: {error}</p>
-        <p className="text-sm text-gray-500 mt-2">โปรดตรวจสอบการเชื่อมต่อหรือลองใหม่</p>
       </div>
     );
   }
@@ -223,327 +217,281 @@ export default function DashboardTCAS({ table, year }: DashboardTCASProps) {
   if (data.length === 0) {
     return (
       <div className="mt-8 p-8 text-center border rounded-lg bg-gray-50">
-        <p className="text-gray-500">ไม่มีข้อมูลสำหรับ {table} ปีการศึกษา {year}</p>
+        <p className="text-gray-500">ไม่มีข้อมูลสำหรับ {table} ปีการศึกษา {years.join(', ')} {major !== 'all' ? `สาขา ${major}` : ''}</p>
       </div>
     );
   }
 
   return (
-    <div id={`dashboard-${table}-${year}`} className="mt-8 space-y-6">
-      {/* Dashboard Header */}
+    <div id={`dashboard-${table}`} className="mt-8 space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold">Dashboard {table.toUpperCase().replace('_', ' ')}</h2>
+        <h2 className="text-xl font-semibold">
+          Dashboard {table.toUpperCase().replace('_', ' ')}
+          <span className="text-sm font-normal text-muted-foreground ml-2">
+            ({years.length} ปี{years.length > 1 ? 's' : ''}: {years.join(', ')} | Major: {major === "all" ? "All" : major})
+          </span>
+        </h2>
       </div>
 
-      {/* Summary Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* Total Card */}
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg">TOTAL</CardTitle>
+            <CardTitle className="text-sm">TOTAL APPLICANTS</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatNumber(summaryData.applicants)}</div>
-            <p className="text-sm text-muted-foreground mt-1">จำนวนผู้สมัครทั้งหมด</p>
+            <div className="text-2xl font-bold">{formatNumber(totalApplicants)}</div>
+            <p className="text-sm text-muted-foreground mt-1">
+              {years.length > 1 ? `เฉลี่ย ${formatNumber(totalApplicants / years.length)} ต่อปี` : 'จำนวนผู้สมัครทั้งหมด'}
+            </p>
           </CardContent>
         </Card>
 
-        {/* Summary Card 2 */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Summary card</CardTitle>
+            <CardTitle className="text-sm">TOTAL REGISTERED</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-sm">จำนวนผู้ผ่านการคัดเลือก</span>
-                <span className="font-medium">{formatNumber(summaryData.qualified)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm">จำนวนผู้รายงานตัว</span>
-                <span className="font-medium">{formatNumber(summaryData.registered)}</span>
-              </div>
-            </div>
+            <div className="text-2xl font-bold">{formatNumber(totalRegistered)}</div>
+            <p className="text-sm text-muted-foreground mt-1">
+              Registration Rate: {calculatePercentage(totalRegistered, totalApplicants)}%
+            </p>
           </CardContent>
         </Card>
 
-        {/* Summary Card 3 */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Summary card</CardTitle>
+            <CardTitle className="text-sm">TOTAL QUOTA</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-sm">อัตราผ่านการคัดเลือก</span>
-                <span className="font-medium text-green-600">{summaryData.qualificationRate}%</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm">อัตราการรายงานตัว</span>
-                <span className="font-medium text-purple-600">{summaryData.registrationRate}%</span>
-              </div>
-            </div>
+            <div className="text-2xl font-bold">{formatNumber(totalQuota)}</div>
+            <p className="text-sm text-muted-foreground mt-1">
+              Fill Rate: {calculatePercentage(totalRegistered, totalQuota)}%
+            </p>
           </CardContent>
         </Card>
 
-        {/* Summary Card 4 */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Summary card</CardTitle>
+            <CardTitle className="text-sm">DATA ENTRIES</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600 mb-2">
-                {summaryData.qualified > 0 
-                  ? `${Math.round((summaryData.registered / summaryData.qualified) * 100)}%`
-                  : "0%"}
-              </div>
-              <p className="text-sm text-muted-foreground">อัตรารายงานตัวจากผู้ผ่านการคัดเลือก</p>
-            </div>
+            <div className="text-2xl font-bold">{data.length}</div>
+            <p className="text-sm text-muted-foreground mt-1">
+              {major !== "all" ? "Single Major" : "All Majors"} across {years.length} year{years.length > 1 ? 's' : ''}
+            </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Line Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Line Chart</CardTitle>
-            <CardDescription>เปรียบเทียบ ผู้ผ่านการคัดเลือกและผู้รายงานตัว</CardDescription>
-          </CardHeader>
-          <CardContent className="h-[350px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart
-                data={lineChartData}
-                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="name" 
-                  angle={-45}
-                  textAnchor="end"
-                  height={60}
-                  interval={0}
-                  tick={{ fontSize: 10 }}
-                />
-                <YAxis />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend />
-                <Line 
-                  type="monotone" 
-                  dataKey="registered" 
-                  name="ผู้รายงานตัว"
-                  stroke="#8b5cf6" 
-                  strokeWidth={2}
-                  activeDot={{ r: 6 }}
-                  dot={{ r: 3 }}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="qualified" 
-                  name="ผู้ผ่านการคัดเลือก"
-                  stroke="#10b981" 
-                  strokeWidth={2}
-                  dot={{ r: 3 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+      {/* Tabs for different views */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="yearly">Year Comparison</TabsTrigger>
+          <TabsTrigger value="majors">Top Majors</TabsTrigger>
+          {major !== "all" && years.length > 1 && (
+            <TabsTrigger value="major-trend">Major Trend</TabsTrigger>
+          )}
+        </TabsList>
 
-        {/* Bar Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Bar Chart</CardTitle>
-            <CardDescription>เปรียบเทียบจำนวนผู้สมัครแต่ละเอก</CardDescription>
-          </CardHeader>
-          <CardContent className="h-[350px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={barChartData}
-                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="name" 
-                  angle={-45}
-                  textAnchor="end"
-                  height={60}
-                  interval={0}
-                  tick={{ fontSize: 10 }}
-                />
-                <YAxis />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend />
-                <Bar 
-                  dataKey="applicants" 
-                  name="จำนวนผู้สมัคร"
-                  radius={[4, 4, 0, 0]}
-                >
-                  {barChartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill || COLORS[index % COLORS.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
+        <TabsContent value="overview" className="space-y-6">
+          {/* Yearly Trend Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Yearly Trend Comparison</CardTitle>
+              <CardDescription>เปรียบเทียบแนวโน้มรายปี</CardDescription>
+            </CardHeader>
+            <CardContent className="h-[350px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={lineChartData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="year" />
+                  <YAxis />
+                  <Tooltip formatter={(value) => formatNumber(value)} />
+                  <Legend />
+                  <Line type="monotone" dataKey="applicants" stroke="#3b82f6" name="Applicants" />
+                  <Line type="monotone" dataKey="qualified" stroke="#10b981" name="Qualified" />
+                  <Line type="monotone" dataKey="registered" stroke="#8b5cf6" name="Registered" />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
 
-      {/* Stats Summary Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">สรุปสถิติสำคัญ</CardTitle>
-          <CardDescription>ข้อมูลเปรียบเทียบและวิเคราะห์เพิ่มเติม</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="p-4 border rounded-lg">
-              <div className="text-sm text-gray-500 mb-1">สาขาที่มีผู้สมัครสูงสุด</div>
-              <div className="text-lg font-semibold truncate">
-                {data.length > 0 
-                  ? getMajorName(data.reduce((max, current) => 
-                      toNumber(current.applicants) > toNumber(max.applicants) ? current : max
-                    ))
-                  : "-"
-                }
-              </div>
-              <div className="text-sm text-gray-600 mt-1">
-                {data.length > 0 
-                  ? `${Math.max(...data.map(d => toNumber(d.applicants))).toLocaleString()} คน`
-                  : ""
-                }
-              </div>
-            </div>
+          {/* Top Majors Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Top 10 Majors by Applicants</CardTitle>
+              <CardDescription>สาขายอดนิยมตามจำนวนผู้สมัคร</CardDescription>
+            </CardHeader>
+            <CardContent className="h-[350px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={topMajors}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
+                  <YAxis />
+                  <Tooltip formatter={(value) => formatNumber(value)} />
+                  <Legend />
+                  <Bar dataKey="applicants" name="Applicants" fill="#3b82f6">
+                    {topMajors.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-            <div className="p-4 border rounded-lg">
-              <div className="text-sm text-gray-500 mb-1">ค่าเฉลี่ยผู้สมัครต่อสาขา</div>
-              <div className="text-lg font-semibold">
-                {data.length > 0 
-                  ? Math.round(summaryData.applicants / data.length).toLocaleString()
-                  : "0"
-                }
-              </div>
-              <div className="text-sm text-gray-600 mt-1">
-                จากทั้งหมด {data.length} สาขา
-              </div>
-            </div>
+        <TabsContent value="yearly" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Year-by-Year Comparison</CardTitle>
+              <CardDescription>เปรียบเทียบประสิทธิภาพแต่ละปี</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {/* Registration Rate Comparison */}
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={yearComparisonData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="year" />
+                      <YAxis yAxisId="left" />
+                      <YAxis yAxisId="right" orientation="right" />
+                      <Tooltip />
+                      <Legend />
+                      <Bar yAxisId="left" dataKey="applicants" name="Applicants" fill="#3b82f6" />
+                      <Bar yAxisId="left" dataKey="registered" name="Registered" fill="#8b5cf6" />
+                      <Line yAxisId="right" type="monotone" dataKey="registrationRate" name="Registration Rate %" stroke="#10b981" strokeWidth={2} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
 
-            <div className="p-4 border rounded-lg">
-              <div className="text-sm text-gray-500 mb-1">สาขาที่มีผู้ผ่านการคัดเลือกสูงสุด</div>
-              <div className="text-lg font-semibold truncate">
-                {data.length > 0 
-                  ? getMajorName(data.reduce((max, current) => 
-                      toNumber(current.qualified) > toNumber(max.qualified) ? current : max
-                    ))
-                  : "-"
-                }
-              </div>
-              <div className="text-sm text-gray-600 mt-1">
-                {data.length > 0 
-                  ? `${Math.max(...data.map(d => toNumber(d.qualified))).toLocaleString()} คน`
-                  : ""
-                }
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Pie Chart Summary */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle className="text-base">สรุปภาพรวมทั้งหมด</CardTitle>
-            <CardDescription>อัตราส่วนผู้สมัคร/ผ่านการคัดเลือก/รายงานตัว</CardDescription>
-          </CardHeader>
-          <CardContent className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={pieChartData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }: { name: string, percent: number }) => 
-                    `${name}: ${(percent * 100).toFixed(0)}%`
-                  }
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {pieChartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  formatter={(value: number) => formatNumber(value)}
-                />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-base">ตารางสรุปข้อมูลโดยละเอียด</CardTitle>
-            <CardDescription>แสดงข้อมูลครบถ้วนทุกสาขา</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-3 px-2 font-medium">ลำดับ</th>
-                    <th className="text-left py-3 px-2 font-medium">ชื่อเอก/สาขา</th>
-                    <th className="text-left py-3 px-2 font-medium text-blue-600">ผู้สมัคร</th>
-                    <th className="text-left py-3 px-2 font-medium text-green-600">ผ่านการคัดเลือก</th>
-                    <th className="text-left py-3 px-2 font-medium text-purple-600">รายงานตัว</th>
-                    <th className="text-left py-3 px-2 font-medium">อัตราการรายงานตัว</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.map((row, index) => {
-                    const applicants = toNumber(row.applicants);
-                    const qualified = toNumber(row.qualified);
-                    const registered = toNumber(row.registered);
-                    const registrationRate = calculatePercentage(registered, applicants);
-                    const qualificationRate = calculatePercentage(qualified, applicants);
-                    const majorName = getMajorName(row);
-                    
-                    return (
-                      <tr key={row.id || index} className="border-b hover:bg-gray-50">
-                        <td className="py-3 px-2 text-center">{index + 1}</td>
-                        <td className="py-3 px-2 font-medium">{majorName}</td>
-                        <td className="py-3 px-2 text-blue-600">{formatNumber(applicants)}</td>
-                        <td className="py-3 px-2 text-green-600">
-                          {formatNumber(qualified)}
-                          <span className="text-xs text-gray-500 ml-1">({qualificationRate}%)</span>
-                        </td>
-                        <td className="py-3 px-2 text-purple-600">
-                          {formatNumber(registered)}
-                          <span className="text-xs text-gray-500 ml-1">({registrationRate}%)</span>
-                        </td>
-                        <td className="py-3 px-2">
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="bg-purple-600 h-2 rounded-full" 
-                              style={{ width: `${registrationRate}%` }}
-                            ></div>
-                          </div>
-                          <div className="text-xs text-gray-500 mt-1">{registrationRate}%</div>
-                        </td>
+                {/* Yearly Summary Table */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-2 px-4">Year</th>
+                        <th className="text-left py-2 px-4">Applicants</th>
+                        <th className="text-left py-2 px-4">Registered</th>
+                        <th className="text-left py-2 px-4">Registration Rate</th>
+                        <th className="text-left py-2 px-4">Quota Fill Rate</th>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+                    </thead>
+                    <tbody>
+                      {yearlySummaries.map((summary) => (
+                        <tr key={summary.year} className="border-b hover:bg-gray-50">
+                          <td className="py-2 px-4 font-medium">{summary.year}</td>
+                          <td className="py-2 px-4">{formatNumber(summary.applicants)}</td>
+                          <td className="py-2 px-4">{formatNumber(summary.registered)}</td>
+                          <td className="py-2 px-4">
+                            <div className="flex items-center gap-2">
+                              <div className="w-full bg-gray-200 rounded-full h-2">
+                                <div 
+                                  className="bg-green-600 h-2 rounded-full" 
+                                  style={{ width: `${calculatePercentage(summary.registered, summary.applicants)}%` }}
+                                />
+                              </div>
+                              <span>{calculatePercentage(summary.registered, summary.applicants)}%</span>
+                            </div>
+                          </td>
+                          <td className="py-2 px-4">
+                            <div className="flex items-center gap-2">
+                              <div className="w-full bg-gray-200 rounded-full h-2">
+                                <div 
+                                  className="bg-blue-600 h-2 rounded-full" 
+                                  style={{ width: `${calculatePercentage(summary.registered, summary.quota)}%` }}
+                                />
+                              </div>
+                              <span>{calculatePercentage(summary.registered, summary.quota)}%</span>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="majors" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Major Performance Analysis</CardTitle>
+              <CardDescription>วิเคราะห์ประสิทธิภาพของแต่ละสาขา</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[400px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ScatterChart>
+                    <CartesianGrid />
+                    <XAxis type="number" dataKey="applicants" name="Applicants" />
+                    <YAxis type="number" dataKey="registered" name="Registered" />
+                    <ZAxis type="number" dataKey="year" range={[100, 1000]} />
+                    <Tooltip 
+                      formatter={(value, name) => [formatNumber(value), name]}
+                      labelFormatter={(label) => `Year: ${label}`}
+                    />
+                    <Legend />
+                    <Scatter name="Majors" data={data.map(d => ({
+                      applicants: toNumber(d.applicants),
+                      registered: toNumber(d.registered),
+                      year: d.year,
+                      name: getMajorName(d),
+                    }))} fill="#8884d8" />
+                  </ScatterChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {major !== "all" && years.length > 1 && (
+          <TabsContent value="major-trend" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Major Trend Analysis: {major}</CardTitle>
+                <CardDescription>ติดตามแนวโน้มของสาขา {major} ตามปี</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[350px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={majorPerformanceData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="year" />
+                      <YAxis />
+                      <YAxis yAxisId="right" orientation="right" />
+                      <Tooltip 
+                        formatter={(value, name) => {
+                          if (name === "registrationRate") {
+                            return [`${value}%`, "Registration Rate"];
+                          }
+                          return [formatNumber(value), name];
+                        }}
+                      />
+                      <Legend />
+                      <Line type="monotone" dataKey="applicants" stroke="#3b82f6" name="Applicants" />
+                      <Line type="monotone" dataKey="registered" stroke="#8b5cf6" name="Registered" />
+                      <Line 
+                        yAxisId="right"
+                        type="monotone" 
+                        dataKey="registrationRate" 
+                        stroke="#10b981" 
+                        name="Registration Rate %" 
+                        strokeWidth={2}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+      </Tabs>
     </div>
   );
 }

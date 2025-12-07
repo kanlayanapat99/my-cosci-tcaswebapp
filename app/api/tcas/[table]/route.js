@@ -1,3 +1,4 @@
+// app/api/tcas/[table]/route.ts
 import { db } from "@/lib/db";
 import { NextResponse } from 'next/server';
 
@@ -6,9 +7,13 @@ export async function GET(req, context) {
     const { params } = context;
     const { table } = await params;
     const { searchParams } = new URL(req.url);
-    const year = searchParams.get("year");
     
-    // Validate table name to prevent SQL injection
+    // Get query parameters
+    const years = searchParams.get("years");
+    const year = searchParams.get("year"); // สำหรับ backward compatibility
+    const major = searchParams.get("major");
+    
+    // Validate table name
     if (!/^tcas_[1-4]$/.test(table)) {
       return NextResponse.json(
         { error: "Invalid table name" },
@@ -19,9 +24,22 @@ export async function GET(req, context) {
     let query = `SELECT * FROM ${table} WHERE 1=1`;
     const paramsArray = [];
 
-    if (year) {
+    // Handle multiple years OR single year
+    if (years) {
+      const yearArray = years.split(',').filter(y => y.trim() !== '');
+      if (yearArray.length > 0) {
+        query += ` AND year IN (${yearArray.map(() => '?').join(',')})`;
+        paramsArray.push(...yearArray);
+      }
+    } else if (year) {
       query += " AND year = ?";
       paramsArray.push(year);
+    }
+
+    // Handle major filter
+    if (major && major !== "all") {
+      query += " AND major LIKE ?";
+      paramsArray.push(`%${major}%`);
     }
 
     const [rows] = await db.query(query, paramsArray);
@@ -31,7 +49,7 @@ export async function GET(req, context) {
   }
 }
 
-//PUT
+// PUT method remains the same
 export async function PUT(req, context) {
   try {
     const { params } = context;
@@ -50,7 +68,6 @@ export async function PUT(req, context) {
       registered,
     } = body;
 
-    // Validate table name
     if (!/^tcas_[1-4]$/.test(table)) {
       return NextResponse.json(
         { error: "Invalid table name" },
@@ -58,7 +75,6 @@ export async function PUT(req, context) {
       );
     }
 
-    // Update row
     await db.query(
       `UPDATE ${table}
        SET year = ?, major = ?, quota = ?, applicants = ?, interview_eligible = ?, interview_attended = ?, qualified = ?, confirmed = ?, registered = ?

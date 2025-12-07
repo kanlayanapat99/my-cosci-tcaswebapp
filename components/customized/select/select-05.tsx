@@ -1,4 +1,4 @@
-import { Label } from "@/components/customized/select/label";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,

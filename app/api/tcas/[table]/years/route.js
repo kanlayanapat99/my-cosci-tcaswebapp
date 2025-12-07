@@ -3,8 +3,8 @@ import { NextResponse } from 'next/server';
 
 export async function GET(request, context) {
   try {
-    const { params } = context;
-    const { table } = await params;
+    // ต้องใช้ await เพื่อดึง params
+    const { table } = await context.params;
     
     // Validate table name
     if (!/^tcas_[1-4]$/.test(table)) {
@@ -19,6 +19,7 @@ export async function GET(request, context) {
     );
     return NextResponse.json(rows);
   } catch (err) {
+    console.error('Error fetching years:', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

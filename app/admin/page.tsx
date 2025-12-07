@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/customized/select/label";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectTrigger,

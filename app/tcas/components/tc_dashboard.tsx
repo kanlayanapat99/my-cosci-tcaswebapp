@@ -1,4 +1,3 @@
-// components/tc_dashboard.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -19,12 +18,7 @@ import {
   Pie,
 } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
-import { Download } from "lucide-react";
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
 
-// Type สำหรับข้อมูลจาก API ของตาราง - ปรับตามโครงสร้างข้อมูลจริง
 interface TableRowData {
   id?: number;
   major?: string;           // ชื่อเอก/สาขา
@@ -183,184 +177,6 @@ export default function DashboardTCAS({ table, year }: DashboardTCASProps) {
     { name: "รายงานตัว", value: summaryData.registered, color: "#8b5cf6" },
   ];
 
-  // ฟังก์ชัน Export เป็น PDF
-  const handleExportPDF = async () => {
-  const element = document.getElementById(`dashboard-${table}-${year}`);
-  if (!element) return;
-
-  try {
-    alert('กำลังสร้าง PDF... กรุณารอสักครู่');
-    
-    // 1. แก้ไขฟังก์ชันสี CSS ที่ไม่รองรับก่อน capture
-    type StyleProperty = 
-      | 'backgroundColor'
-      | 'color'
-      | 'borderColor'
-      | 'borderTopColor'
-      | 'borderRightColor'
-      | 'borderBottomColor'
-      | 'borderLeftColor'
-      | 'outlineColor'
-      | 'textDecorationColor'
-      | 'columnRuleColor';
-    
-    interface StyleKey {
-      el: Element;
-      prop: StyleProperty;
-    }
-    
-    const originalStyles = new Map<StyleKey, string>();
-    
-    // หาองค์ประกอบทั้งหมดที่มีฟังก์ชันสี lab, lch, oklab, oklch
-    const allElements = element.querySelectorAll('*');
-    
-    allElements.forEach((el: Element) => {
-      const style = window.getComputedStyle(el);
-      
-      // ตรวจสอบคุณสมบัติสีทั้งหมด
-      const colorProperties: StyleProperty[] = [
-        'backgroundColor',
-        'color',
-        'borderColor',
-        'borderTopColor',
-        'borderRightColor',
-        'borderBottomColor',
-        'borderLeftColor',
-        'outlineColor',
-        'textDecorationColor',
-        'columnRuleColor'
-      ];
-      
-      colorProperties.forEach(prop => {
-        const value = style.getPropertyValue(prop);
-        if (value && (value.includes('lab(') || value.includes('lch(') || 
-            value.includes('oklab(') || value.includes('oklch('))) {
-          
-          // บันทึกค่าเดิม
-          const htmlEl = el as HTMLElement;
-          const styleValue = htmlEl.style.getPropertyValue(prop);
-          originalStyles.set({el, prop}, styleValue);
-          
-          // แทนที่ด้วยสี hex ที่ปลอดภัย
-          let safeColor = '#ffffff'; // default white
-          
-          if (value.includes('lab(') || value.includes('oklab(')) {
-            // ถ้าเป็นสี light ให้ใช้สีเทาอ่อน
-            safeColor = '#f3f4f6';
-          } else if (value.includes('lch(') || value.includes('oklch(')) {
-            // ถ้าเป็นสีเข้มให้ใช้สีเทาเข้ม
-            safeColor = '#6b7280';
-          }
-          
-          htmlEl.style.setProperty(prop, safeColor, 'important');
-        }
-      });
-    });
-    
-    // 2. ตั้งค่า element สำหรับ capture
-    interface OriginalElementStyles {
-      height: string;
-      overflow: string;
-      position: string;
-      width: string;
-      left: string;
-      top: string;
-    }
-    
-    const originalElementStyles: OriginalElementStyles = {
-      height: element.style.height,
-      overflow: element.style.overflow,
-      position: element.style.position,
-      width: element.style.width,
-      left: element.style.left,
-      top: element.style.top
-    };
-    
-    element.style.height = 'auto';
-    element.style.overflow = 'visible';
-    element.style.position = 'absolute';
-    element.style.width = '100%';
-    element.style.left = '0';
-    element.style.top = '0';
-    
-    // 3. รอให้การเปลี่ยนแปลง layout เสร็จสิ้น
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // 4. ใช้ html2canvas
-    const canvas = await html2canvas(element, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: '#ffffff',
-      logging: false,
-      allowTaint: true,
-      removeContainer: true,
-      foreignObjectRendering: false,
-      imageTimeout: 15000,
-      width: element.scrollWidth,
-      height: element.scrollHeight,
-      onclone: (clonedDoc: Document, clonedElement: HTMLElement) => {
-        // ป้องกันฟังก์ชันสีที่ไม่รองรับใน cloned element
-        const allClonedElements = clonedElement.querySelectorAll('*');
-        allClonedElements.forEach((el: Element) => {
-          const htmlEl = el as HTMLElement;
-          // ลบ inline styles ที่อาจมีฟังก์ชันสีที่ไม่รองรับ
-          htmlEl.removeAttribute('style');
-          
-          // เพิ่มสไตล์พื้นฐาน
-          htmlEl.style.backgroundColor = 'white';
-          htmlEl.style.color = 'black';
-        });
-      }
-    });
-    
-    // 5. คืนค่าสไตล์เดิม
-    Object.assign(element.style, originalElementStyles);
-    
-    // คืนค่าฟังก์ชันสีเดิม
-    originalStyles.forEach((value: string, key: StyleKey) => {
-      if (key.el && key.prop && value !== undefined) {
-        const htmlEl = key.el as HTMLElement;
-        htmlEl.style.setProperty(key.prop, value);
-      }
-    });
-    
-    // 6. สร้าง PDF (แก้ไขส่วนนี้)
-    const imgData = canvas.toDataURL('image/png');
-    const pdf = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4'
-    });
-    
-    const imgWidth = 210; // ความกว้าง A4
-    const pageHeight = 297; // ความสูง A4
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    
-    let heightLeft = imgHeight;
-    let position = 0;
-    
-    // เพิ่มหน้าแรก
-    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-    heightLeft -= pageHeight;
-    
-    // เพิ่มหน้าต่อไปถ้าจำเป็น
-    while (heightLeft >= 0) {
-      position -= pageHeight; // ย้ายตำแหน่งขึ้นสำหรับหน้าใหม่
-      pdf.addPage();
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-    }
-    
-    // บันทึกไฟล์
-    pdf.save(`dashboard-${table}-${year}.pdf`);
-    alert('สร้าง PDF สำเร็จแล้ว!');
-    
-  } catch (err: unknown) {
-    console.error('Error exporting PDF:', err);
-    alert('เกิดข้อผิดพลาดในการสร้าง PDF: ' + (err as Error).message);
-  }
-};
-
   // Custom Tooltip สำหรับกราฟ
   const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
     if (active && payload && payload.length) {
@@ -417,17 +233,6 @@ export default function DashboardTCAS({ table, year }: DashboardTCASProps) {
       {/* Dashboard Header */}
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold">Dashboard {table.toUpperCase().replace('_', ' ')}</h2>
-        <div className="flex items-center gap-4">
-          <Button 
-            onClick={handleExportPDF} 
-            variant="outline" 
-            size="sm"
-            className="gap-2 hover:bg-blue-300"
-          >
-            <Download className="h-4 w-4" />
-            Expand dashboard as PDF
-          </Button>
-        </div>
       </div>
 
       {/* Summary Cards Grid */}

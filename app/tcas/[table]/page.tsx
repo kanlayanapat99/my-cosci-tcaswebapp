@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import TableTCAS from "../components/tc_table";
 import DashboardTCAS from "../components/tc_dashboard";
+import SchoolsTCAS from "../components/tc_schools";
 import PageTransition from "@/components/ui/pageTransition";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -19,7 +20,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { X, Filter, Calendar, BookOpen } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { X, Filter, Calendar, BookOpen, School, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/customized/alert/alert";
+
 
 type YearItem = { year: string };
 
@@ -56,7 +60,7 @@ export default function Page() {
       fetch(`/api/tcas/${table}/majors?years=${yearsParam}`)
         .then(res => res.json())
         .then((data: string[]) => {
-          setMajorList(['all', ...data]); // เพิ่ม option 'all'
+          setMajorList(['all', ...data]);
         });
     }
   }, [table, selectedYears]);
@@ -68,11 +72,6 @@ export default function Page() {
     } else {
       setSelectedYears([...selectedYears, year]);
     }
-  };
-
-  // Handler สำหรับลบปีที่เลือก
-  const removeYear = (yearToRemove: string) => {
-    setSelectedYears(selectedYears.filter(year => year !== yearToRemove));
   };
 
   // Handler สำหรับเลือกทุกปี
@@ -94,7 +93,7 @@ export default function Page() {
 
   return (
     <PageTransition>
-      <div className="p-10 space-y-6">
+      <div className="p-10 space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold">{displayName}</h1>
@@ -156,24 +155,6 @@ export default function Page() {
                 </SelectContent>
               </Select>
               
-              {/* Selected Years Badges */}
-              {selectedYears.length > 0 && (
-                <div className="absolute top-full mt-2 flex flex-wrap gap-1">
-                  {selectedYears.map(year => (
-                    <Badge
-                      key={year}
-                      variant="secondary"
-                      className="flex items-center gap-1"
-                    >
-                      {year}
-                      <X
-                        className="h-3 w-3 cursor-pointer"
-                        onClick={() => removeYear(year)}
-                      />
-                    </Badge>
-                  ))}
-                </div>
-              )}
             </div>
 
             {/* Major Filter */}
@@ -230,29 +211,83 @@ export default function Page() {
           </div>
         </div>
 
-        {/* Dashboard and Table */}
-        {selectedYears.length > 0 && (
-          <>
-            <DashboardTCAS 
-              table={table} 
-              years={selectedYears} 
-              major={selectedMajor} 
-            />
-            <Separator className="my-8" />
-            <TableTCAS 
-              table={table} 
-              years={selectedYears} 
-              major={selectedMajor} 
-            />
-          </>
-        )}
+        {/* Main Content - แสดงทั้ง 3 ส่วนเรียงต่อกัน */}
+        <div className="space-y-8">
+          {/* Dashboard Section */}
+          {selectedYears.length > 0 ? (
+            <>
+              <div>
+                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                  <div className="w-2 h-6 bg-blue-500 rounded"></div>
+                  Dashboard Overview
+                </h2>
+                <DashboardTCAS 
+                  table={table} 
+                  years={selectedYears} 
+                  major={selectedMajor} 
+                />
+              </div>
 
-        {/* Warning if no years selected */}
-        {selectedYears.length === 0 && (
-          <div className="text-center p-8 border rounded-lg bg-yellow-50">
-            <p className="text-yellow-600">Please select at least one year to view data</p>
-          </div>
-        )}
+              {/* Table Section */}
+              <div>
+                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                  <div className="w-2 h-6 bg-purple-500 rounded"></div>
+                  Detailed Table Data
+                </h2>
+                <TableTCAS 
+                  table={table} 
+                  years={selectedYears} 
+                  major={selectedMajor} 
+                />
+              </div>
+
+              {/* Schools Section */}
+              <div>
+                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                  <div className="w-2 h-6 bg-green-500 rounded"></div>
+                  School Information
+                </h2>
+                {selectedMajor !== "all" ? (
+                  <>
+                    <SchoolsTCAS 
+                      table={table}
+                      years={selectedYears}
+                      major={selectedMajor}
+                    />
+                    <Alert className="mt-4 bg-amber-50 border-amber-200">
+                      <AlertCircle className="h-4 w-4 text-amber-600" />
+                      <AlertDescription className="text-amber-700">
+                        School data is currently using mock data for demonstration purposes. In production, this will connect to actual school database.
+                      </AlertDescription>
+                    </Alert>
+                  </>
+                ) : (
+                  <div className="text-center p-8 border rounded-lg bg-blue-50">
+                    <School className="h-12 w-12 text-blue-300 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-blue-800 mb-2">
+                      Select a specific major to view school information
+                    </h3>
+                    <p className="text-blue-700">
+                      Please select a specific major from the filter above to view detailed school information
+                    </p>
+                  </div>
+                )}
+              </div>
+
+            </>
+          ) : (
+            <div className="text-center p-12 border rounded-lg bg-yellow-50">
+              <Calendar className="h-16 w-16 text-yellow-400 mx-auto mb-4" />
+              <h3 className="text-xl font-medium text-yellow-800 mb-2">No Years Selected</h3>
+              <p className="text-yellow-700 mb-4">
+                Please select at least one year to view the data
+              </p>
+              <Button onClick={selectAllYears} variant="outline">
+                Select All Available Years
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
     </PageTransition>
   );

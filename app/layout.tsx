@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Navbar from "@/components/navbar-02/navbar";
 import Footer from "@/components/footer/footer";
+import { AppToaster } from "@/components/ui/sonner";
 
 export const metadata: Metadata = {
   title: "COSCI TCAS WebApp",
@@ -18,6 +19,7 @@ export default function RootLayout({
       <body>
         <Navbar/>
         <main className="pt-5"> {children} </main>
+        <AppToaster />
         <Footer/>
       </body>
     </html>

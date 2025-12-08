@@ -71,7 +71,7 @@ export async function POST(req) {
 
     // 4. Insert ลง database
     await db.query(
-      `INSERT INTO ${table} (id, year, major, quota, applicants, qualified, confirmed, registered) VALUES ?`,
+      `INSERT INTO ${table} (id, year, major, quota, applicants, interview_eligible, interview_attended, qualified, confirmed, registered) VALUES ?`,
       [inserts]
     );
 

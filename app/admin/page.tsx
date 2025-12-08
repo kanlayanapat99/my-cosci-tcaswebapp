@@ -225,6 +225,10 @@ export default function AdminDashboard() {
             </SelectContent>
           </Select>
         </div>
+        <Link href="/admin/upload">
+          <Button className="mt-4">
+            Upload TCAS File</Button>
+        </Link>
       </div>
 
       <div className="grid grid-cols-4 gap-4">

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AlertCircle, CheckCircle, ArrowLeft } from 'lucide-react';
+import { AlertCircle, CheckCircle, ArrowLeft, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/customized/alert/alert';
 import Link from 'next/link';
 
@@ -27,6 +27,7 @@ export default function EditAdminPage() {
     confirmPassword: '',
   });
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [updating, setUpdating] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
@@ -39,7 +40,8 @@ export default function EditAdminPage() {
       // ตรวจสอบการล็อกอิน
       const authResponse = await fetch('/api/auth/check');
       if (!authResponse.ok) {
-        router.push('/login');
+        setAuthError('กรุณาล็อกอินก่อนเข้าถึงหน้านี้');
+        setLoading(false);
         return;
       }
 
@@ -51,7 +53,7 @@ export default function EditAdminPage() {
       }
     } catch (error) {
       console.error('Error fetching user:', error);
-      router.push('/login');
+      setAuthError('เกิดข้อผิดพลาดในการตรวจสอบการล็อกอิน');
     } finally {
       setLoading(false);
     }
@@ -144,10 +146,58 @@ export default function EditAdminPage() {
     }
   };
 
+  const goToLogin = () => {
+    router.push('/login');
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse text-gray-500">กำลังโหลดข้อมูล...</div>
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+          <div className="text-gray-500">กำลังตรวจสอบการล็อกอิน...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (authError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 p-4 md:p-6">
+        <div className="max-w-2xl mx-auto">
+          <div className="mb-6">
+            <Link href="/">
+              <Button variant="outline" size="sm" className="gap-2 mb-4">
+                <ArrowLeft className="h-4 w-4" />
+                กลับสู่หน้าหลัก
+              </Button>
+            </Link>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">เปลี่ยนรหัสผ่าน Admin</h1>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-red-600">ไม่สามารถเข้าถึงหน้านี้ได้</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{authError}</AlertDescription>
+              </Alert>
+              
+              <div className="flex gap-3">
+                <Button onClick={goToLogin} className="flex-1">
+                  ไปยังหน้าล็อกอิน
+                </Button>
+                <Link href="/" className="flex-1">
+                  <Button variant="outline" className="w-full">
+                    กลับสู่หน้าหลัก
+                  </Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }

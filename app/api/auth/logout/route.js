@@ -1,5 +1,5 @@
 // app/api/auth/logout/route.js
-import { logout } from '@/app/lib/session';
+import { logout } from '@/lib/session';
 
 export async function POST() {
   try {

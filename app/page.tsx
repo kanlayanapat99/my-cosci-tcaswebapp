@@ -268,35 +268,41 @@ export default function HomePage() {
   };
 
   // ข้อมูลสำหรับกราฟแท่ง (รองรับหลายปี)
-  const barChartData = selectedYears.map(year => {
-    const yearData = tcasData.filter(item => item.year === year);
-    
-    const tcas1 = yearData.find(item => item.table === 'tcas_1');
-    const tcas2 = yearData.find(item => item.table === 'tcas_2');
-    const tcas3 = yearData.find(item => item.table === 'tcas_3');
-    const tcas4 = yearData.find(item => item.table === 'tcas_4');
-    
-    return {
-      year: year,
-      'TCAS 1': tcas1 ? Number(tcas1.total_applicants) || 0 : 0,
-      'TCAS 2': tcas2 ? Number(tcas2.total_applicants) || 0 : 0,
-      'TCAS 3': tcas3 ? Number(tcas3.total_applicants) || 0 : 0,
-      'TCAS 4': tcas4 ? Number(tcas4.total_applicants) || 0 : 0,
-      'TCAS 1 Reg': tcas1 ? Number(tcas1.total_registered) || 0 : 0,
-      'TCAS 2 Reg': tcas2 ? Number(tcas2.total_registered) || 0 : 0,
-      'TCAS 3 Reg': tcas3 ? Number(tcas3.total_registered) || 0 : 0,
-      'TCAS 4 Reg': tcas4 ? Number(tcas4.total_registered) || 0 : 0,
-    };
-  });
+const barChartData = selectedYears.map(year => {
+  const yearData = tcasData.filter(item => item.year === year);
 
-  console.log("barChartData", barChartData);
-console.log("barChartData values:", barChartData.map(item => ({
-  year: item.year,
-  tcas1: item['TCAS 1'],
-  tcas2: item['TCAS 2'],
-  tcas3: item['TCAS 3'],
-  tcas4: item['TCAS 4']
-})));
+  console.log("-------- CHECK --------");
+  console.log("Select year:", year);
+  console.log("TCAS DATA:", tcasData);
+  console.log("yearData:", yearData);
+
+  console.log(`Creating bar chart for year ${year}:`, yearData.map(d => ({
+    table: d.table,
+    applicants: d.total_applicants
+  })));
+  
+  const tcas1 = yearData.find(item => item.table === 'tcas_1');
+  const tcas2 = yearData.find(item => item.table === 'tcas_2');
+  const tcas3 = yearData.find(item => item.table === 'tcas_3');
+  const tcas4 = yearData.find(item => item.table === 'tcas_4');
+  
+  // ข้อมูลจริงจาก API
+  const result = {
+    year: year,
+    'TCAS 1': tcas1 ? Number(tcas1.total_applicants) || 0 : 0,
+    'TCAS 2': tcas2 ? Number(tcas2.total_applicants) || 0 : 0,
+    'TCAS 3': tcas3 ? Number(tcas3.total_applicants) || 0 : 0,
+    'TCAS 4': tcas4 ? Number(tcas4.total_applicants) || 0 : 0,
+    'TCAS 1 Reg': tcas1 ? Number(tcas1.total_registered) || 0 : 0,
+    'TCAS 2 Reg': tcas2 ? Number(tcas2.total_registered) || 0 : 0,
+    'TCAS 3 Reg': tcas3 ? Number(tcas3.total_registered) || 0 : 0,
+    'TCAS 4 Reg': tcas4 ? Number(tcas4.total_registered) || 0 : 0,
+  };
+  
+  console.log(`Result for year ${year}:`, result);
+  return result;
+  
+});
 
   // ข้อมูลสำหรับกราฟเส้น (เปรียบเทียบหลายปี)
   const lineChartData = selectedYears.map(year => {
@@ -543,107 +549,6 @@ console.log("barChartData values:", barChartData.map(item => ({
 
       {/* Main Content */}
       <div className="space-y-8">
-        {/* Bar Chart Section */}
-        <Card>
-          <CardHeader>
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <CardTitle>ภาพรวม TCAS 1-4</CardTitle>
-                <CardDescription>เปรียบเทียบจำนวนผู้สมัครและผู้รายงานตัวหลายปี</CardDescription>
-              </div>
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:w-auto">
-                <TabsList className="grid grid-cols-2 w-full md:w-64">
-                  <TabsTrigger value="applicants" className="flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    ผู้สมัคร
-                  </TabsTrigger>
-                  <TabsTrigger value="registered" className="flex items-center gap-2">
-                    <ClipboardCheck className="h-4 w-4" />
-                    รายงานตัว
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
-          </CardHeader>
-          <CardContent className="h-[400px]">
-            {loading ? (
-              <div className="flex items-center justify-center h-full">
-                <div className="animate-pulse text-gray-500">กำลังโหลดข้อมูล...</div>
-              </div>
-            ) : barChartData.length === 0 ? (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-gray-500">ไม่มีข้อมูลสำหรับปีที่เลือก</div>
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={barChartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="year" />
-                  <YAxis />
-                  <Tooltip 
-                    formatter={(value) => [Number(value).toLocaleString(), "จำนวน"]}
-                  />
-                  <Legend />
-                  {activeTab === "applicants" ? (
-                    <>
-                      <Bar 
-                        dataKey="TCAS 1" 
-                        name="TCAS 1" 
-                        fill="#3b82f6" 
-                        radius={[4, 4, 0, 0]}
-                      />
-                      <Bar 
-                        dataKey="TCAS 2" 
-                        name="TCAS 2" 
-                        fill="#10b981" 
-                        radius={[4, 4, 0, 0]}
-                      />
-                      <Bar 
-                        dataKey="TCAS 3" 
-                        name="TCAS 3" 
-                        fill="#f59e0b" 
-                        radius={[4, 4, 0, 0]}
-                      />
-                      <Bar 
-                        dataKey="TCAS 4" 
-                        name="TCAS 4" 
-                        fill="#8b5cf6" 
-                        radius={[4, 4, 0, 0]}
-                      />
-                    </>
-                  ) : (
-                    <>
-                      <Bar 
-                        dataKey="TCAS 1 Reg" 
-                        name="TCAS 1 รายงานตัว" 
-                        fill="#3b82f6" 
-                        radius={[4, 4, 0, 0]}
-                      />
-                      <Bar 
-                        dataKey="TCAS 2 Reg" 
-                        name="TCAS 2 รายงานตัว" 
-                        fill="#10b981" 
-                        radius={[4, 4, 0, 0]}
-                      />
-                      <Bar 
-                        dataKey="TCAS 3 Reg" 
-                        name="TCAS 3 รายงานตัว" 
-                        fill="#f59e0b" 
-                        radius={[4, 4, 0, 0]}
-                      />
-                      <Bar 
-                        dataKey="TCAS 4 Reg" 
-                        name="TCAS 4 รายงานตัว" 
-                        fill="#8b5cf6" 
-                        radius={[4, 4, 0, 0]}
-                      />
-                    </>
-                  )}
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
 
         {/* Line Chart Section */}
         <Card>

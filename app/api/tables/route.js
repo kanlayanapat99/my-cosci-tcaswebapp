@@ -66,7 +66,7 @@ export async function POST(req) {
       }
 
       const newId = `${majorCode}${newNumber}`;
-      inserts.push([newId, year, major, null, null, null, null, null]);
+      inserts.push([newId, year, major, null, null, null, null, null, null, null]);
     }
 
     // 4. Insert ลง database

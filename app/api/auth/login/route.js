@@ -1,5 +1,5 @@
 // app/api/auth/login/route.js
-import { login } from '@/app/lib/session';
+import { login } from '@/lib/session';
 
 export async function POST(request) {
   try {

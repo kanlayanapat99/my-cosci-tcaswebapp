@@ -1,5 +1,5 @@
 // app/api/admin/change-password/route.js
-import { getCurrentUser, changePassword } from '@/app/lib/session';
+import { getCurrentUser, changePassword } from '@/lib/session';
 
 export async function POST(request) {
   try {

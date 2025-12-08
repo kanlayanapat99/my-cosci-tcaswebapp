@@ -10,7 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import autoTable, { UserOptions } from "jspdf-autotable";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
 
@@ -38,7 +38,7 @@ interface JsPDFWithAutoTable extends jsPDF {
   lastAutoTable?: {
     finalY: number;
   };
-  autoTable?: (options: any) => JsPDFWithAutoTable;
+  autoTable?: (options: UserOptions) => JsPDFWithAutoTable;
 }
 
 export default function TableTCAS({ table, years, major = "all" }: TableTCASProps) {
@@ -130,7 +130,8 @@ export default function TableTCAS({ table, years, major = "all" }: TableTCASProp
     pdfDoc.text(`ปีการศึกษา: ${yearsText}`, 15, 55);
     pdfDoc.text(`สาขา: ${majorText}`, 15, 65);
 
-    autoTable(pdfDoc, {
+    // Define autoTable options with proper type
+    const tableOptions: UserOptions = {
       startY: 70,
       head: [[
         "ปี", "สาขา", "จำนวนรับ", "ผู้สมัคร", "มีสิทธิ์สัมภาษณ์",
@@ -160,7 +161,7 @@ export default function TableTCAS({ table, years, major = "all" }: TableTCASProp
           formatValue(totalRow.registered)
         ]
       ],
-      theme: "grid",
+      theme: "grid" as const,
       styles: {
         font: fontBase64 ? "Sarabun-Light" : "helvetica",
         fontSize: 8,
@@ -168,15 +169,17 @@ export default function TableTCAS({ table, years, major = "all" }: TableTCASProp
       headStyles: {
         fillColor: [230, 230, 230],
         textColor: [0, 0, 0],
-        fontStyle: "normal",
+        fontStyle: "normal" as const,
         font: fontBase64 ? "Sarabun-Light" : "helvetica",
       },
-    });
+    };
+
+    autoTable(pdfDoc, tableOptions);
 
     // Add yearly summary
     const startY = pdfDoc.lastAutoTable ? pdfDoc.lastAutoTable.finalY + 10 : 70;
     
-    autoTable(pdfDoc, {
+    const yearlyOptions: UserOptions = {
       startY,
       head: [["สรุปรายปี", "จำนวนรับ", "ผู้สมัคร", "มีสิทธิ์สัมภาษณ์", "เข้าสัมภาษณ์", "ผ่านการคัดเลือก", "ยืนยันสิทธิ์", "รายงานตัว"]],
       body: yearlyTotals.map(t => [
@@ -189,7 +192,7 @@ export default function TableTCAS({ table, years, major = "all" }: TableTCASProp
         formatValue(t.confirmed),
         formatValue(t.registered)
       ]),
-      theme: "grid",
+      theme: "grid" as const,
       styles: {
         font: fontBase64 ? "Sarabun-Light" : "helvetica",
         fontSize: 8,
@@ -198,7 +201,9 @@ export default function TableTCAS({ table, years, major = "all" }: TableTCASProp
         fillColor: [200, 230, 200],
         textColor: [0, 0, 0],
       },
-    });
+    };
+
+    autoTable(pdfDoc, yearlyOptions);
 
     const filename = `cosci_${table}_${years.join('-')}_${major === "all" ? "all" : major.substring(0, 20)}.pdf`;
     pdfDoc.save(filename);
@@ -222,7 +227,8 @@ export default function TableTCAS({ table, years, major = "all" }: TableTCASProp
         };
         reader.readAsDataURL(blob);
       });
-    } catch {
+    } catch (error) {
+      console.error("Error loading logo:", error);
       createPDFTable(doc);
     }
   };
@@ -271,13 +277,28 @@ export default function TableTCAS({ table, years, major = "all" }: TableTCASProp
               <TableRow key={`${item.id}-${item.year}`} className="odd:bg-muted/50">
                 <TableCell className="font-medium">{item.year}</TableCell>
                 <TableCell>{formatValue(item.major)}</TableCell>
-                <TableCell>{formatValue(item.quota)}</TableCell>
-                <TableCell>{formatValue(item.applicants)}</TableCell>
+
+                {/* ไฮไลท์จำนวนรับ = ฟ้าอ่อน */}
+                <TableCell className="bg-blue-50">
+                  {formatValue(item.quota)}
+                </TableCell>
+
+                {/* ไฮไลท์ผู้สมัคร = ม่วงอ่อน */}
+                <TableCell className="bg-purple-50">
+                  {formatValue(item.applicants)}
+                </TableCell>
+
                 <TableCell>{formatValue(item.interview_eligible)}</TableCell>
                 <TableCell>{formatValue(item.interview_attended)}</TableCell>
                 <TableCell>{formatValue(item.qualified)}</TableCell>
-                <TableCell>{formatValue(item.confirmed)}</TableCell>
-                <TableCell>{formatValue(item.registered)}</TableCell>
+
+                {/* ไฮไลท์ยืนยันสิทธิ์ = เขียวอ่อน */}
+                <TableCell className="bg-green-50">
+                  {formatValue(item.confirmed)}
+                </TableCell>
+
+                <TableCell className="bg-green-50">
+                  {formatValue(item.registered)}</TableCell>
               </TableRow>
             ))}
             <TableRow className="bg-gray-200 font-bold">

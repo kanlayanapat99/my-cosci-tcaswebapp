@@ -1,4 +1,4 @@
-// app/api/tcas/[table]/route.ts
+// app/api/tcas/[table]/route.js
 import { db } from "@/lib/db";
 import { NextResponse } from 'next/server';
 
@@ -99,3 +99,51 @@ export async function PUT(req, context) {
   }
 }
 
+// DELETE method สำหรับลบข้อมูลตาราง
+export async function DELETE(req, context) {
+  try {
+    const { params } = context;
+    const { table } = await params;
+    const { searchParams } = new URL(req.url);
+    const year = searchParams.get("year");
+
+    // Validate table name
+    if (!/^tcas_[1-4]$/.test(table)) {
+      return NextResponse.json(
+        { error: "Invalid table name" },
+        { status: 400 }
+      );
+    }
+
+    // ถ้าไม่มีปี ให้ลบข้อมูลทั้งหมดในตาราง
+    if (!year) {
+      const [result] = await db.query(`DELETE FROM ${table}`);
+      const affectedRows = result?.affectedRows || 0;
+      
+      return NextResponse.json({ 
+        status: "success", 
+        message: `ลบข้อมูลทั้งหมดในตาราง ${table} สำเร็จ`,
+        deletedCount: affectedRows
+      });
+    }
+
+    // ลบข้อมูลเฉพาะปี
+    const [result] = await db.query(
+      `DELETE FROM ${table} WHERE year = ?`,
+      [year]
+    );
+
+    const affectedRows = result?.affectedRows || 0;
+
+    return NextResponse.json({ 
+      status: "success", 
+      message: `ลบข้อมูลตาราง ${table} ปี ${year} สำเร็จ`,
+      deletedCount: affectedRows
+    });
+  } catch (err) {
+    console.error("Delete error:", err);
+    return NextResponse.json({ 
+      error: err.message || "เกิดข้อผิดพลาดในการลบข้อมูล" 
+    }, { status: 500 });
+  }
+}

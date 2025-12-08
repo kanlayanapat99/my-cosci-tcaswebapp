@@ -46,8 +46,7 @@ export async function middleware(request) {
 
 // กำหนด routes ที่ต้องการให้ middleware ทำงาน
 export const config = {
-  matcher: [
-    '/admin/:path*',          // ทุก route ใต้ /admin
+  matcher: [         // ทุก route ใต้ /admin
     '/admin'
   ],
 };

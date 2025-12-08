@@ -17,6 +17,7 @@ import {
   ScatterChart,
   Scatter,
   ZAxis,
+  TooltipProps
 } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -70,6 +71,11 @@ interface SchoolData {
   province: string;
   applicants: number;
   year: string;
+}
+
+// Type for tooltip payload
+interface TooltipPayload {
+  payload: ScatterData;
 }
 
 // Data for Thai regions
@@ -201,6 +207,31 @@ const getRegionStatistics = (schools: SchoolData[]) => {
       schools: regionSchools.slice(0, 5), // แสดงเพียง 5 โรงเรียนแรก
     };
   }).sort((a, b) => b.totalApplicants - a.totalApplicants); // เรียงตามจำนวนผู้สมัคร
+};
+
+// Custom tooltip for scatter chart with proper types
+interface CustomScatterTooltipProps {
+  active?: boolean;
+  payload?: TooltipPayload[];
+}
+
+const CustomScatterTooltip: React.FC<CustomScatterTooltipProps> = ({ active, payload }) => {
+  if (!active || !payload || payload.length === 0) {
+    return null;
+  }
+
+  const data = payload[0].payload;
+  return (
+    <div className="bg-white p-4 border rounded shadow-lg">
+      <p className="font-bold">{data.major}</p>
+      <p className="text-sm">ปี: {data.year}</p>
+      <p className="text-sm">จำนวนผู้สมัคร: {formatNumber(data.applicants)}</p>
+      <p className="text-sm">จำนวนรายงานตัว: {formatNumber(data.registered)}</p>
+      <p className="text-sm">
+        อัตรารายงานตัว: {calculatePercentage(data.registered, data.applicants)}%
+      </p>
+    </div>
+  );
 };
 
 export default function DashboardTCAS({ table, years, major = "all" }: DashboardTCASProps) {
@@ -341,25 +372,6 @@ export default function DashboardTCAS({ table, years, major = "all" }: Dashboard
 
   // Get region statistics for schools
   const regionStatistics = getRegionStatistics(schoolData);
-
-  // Custom tooltip for scatter chart
-  const CustomScatterTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-white p-4 border rounded shadow-lg">
-          <p className="font-bold">{data.major}</p>
-          <p className="text-sm">ปี: {data.year}</p>
-          <p className="text-sm">จำนวนผู้สมัคร: {formatNumber(data.applicants)}</p>
-          <p className="text-sm">จำนวนรายงานตัว: {formatNumber(data.registered)}</p>
-          <p className="text-sm">
-            อัตรารายงานตัว: {calculatePercentage(data.registered, data.applicants)}%
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
 
   // Custom legend for scatter chart
   const renderScatterLegend = () => {

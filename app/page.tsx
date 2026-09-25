@@ -550,6 +550,57 @@ const barChartData = selectedYears.map(year => {
       {/* Main Content */}
       <div className="space-y-8">
 
+        {/* Bar Chart Section - เทียบผู้สมัคร 4 รอบ TCAS แยกตามปี */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-blue-500" />
+              จำนวนผู้สมัคร TCAS ทั้ง 4 รอบ
+            </CardTitle>
+            <CardDescription>
+              เปรียบเทียบจำนวนผู้สมัครในแต่ละรอบ TCAS
+              {selectedYears.length > 0 && ` — ปีการศึกษา ${selectedYears.join(", ")}`}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="h-[350px]">
+            {loading ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="animate-pulse text-gray-500">กำลังโหลดข้อมูล...</div>
+              </div>
+            ) : barChartData.length === 0 || selectedYears.length === 0 ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-gray-500">ไม่มีข้อมูลสำหรับปีที่เลือก</div>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={barChartData}
+                  margin={{ top: 10, right: 30, left: 10, bottom: 20 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis
+                    dataKey="year"
+                    label={{ value: "ปีการศึกษา", position: "insideBottom", offset: -10 }}
+                  />
+                  <YAxis
+                    tickFormatter={(v) => v.toLocaleString()}
+                    width={70}
+                  />
+                  <Tooltip
+                    formatter={(value, name) => [Number(value).toLocaleString(), name]}
+                    labelFormatter={(label) => `ปีการศึกษา ${label}`}
+                  />
+                  <Legend verticalAlign="top" wrapperStyle={{ paddingBottom: 10 }} />
+                  <Bar dataKey="TCAS 1" name="TCAS 1" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={48} />
+                  <Bar dataKey="TCAS 2" name="TCAS 2" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={48} />
+                  <Bar dataKey="TCAS 3" name="TCAS 3" fill="#f59e0b" radius={[4, 4, 0, 0]} maxBarSize={48} />
+                  <Bar dataKey="TCAS 4" name="TCAS 4" fill="#8b5cf6" radius={[4, 4, 0, 0]} maxBarSize={48} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Line Chart Section */}
         <Card>
           <CardHeader>

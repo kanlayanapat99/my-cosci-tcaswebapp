@@ -103,7 +103,7 @@ export default function LoginPage() {
         </CardContent>
         <CardFooter className="flex flex-col space-y-2">
           <div className="text-sm text-center text-gray-500">
-            © 2024 TCAS Admin System
+            © TCAS Admin System
           </div>
         </CardFooter>
       </Card>

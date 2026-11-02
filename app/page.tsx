@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from "recharts";
 import { ArrowUpRight, Users, UserCheck, ClipboardCheck, Target, Calendar, Filter, BarChart3 } from "lucide-react";
 import Link from "next/link";
+import SchoolsTCAS from "@/app/tcas/components/tc_schools";
 
 type TCASData = {
   table: string;
@@ -666,6 +667,11 @@ const barChartData = selectedYears.map(year => {
             )}
           </CardContent>
         </Card>
+
+        {/* School Ranking Section */}
+        <section id="schools">
+          <SchoolsTCAS />
+        </section>
 
         {/* Year-wise Cards Section */}
         {selectedYears.length > 0 && (

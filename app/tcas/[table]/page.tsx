@@ -247,31 +247,7 @@ export default function Page() {
                   <div className="w-2 h-6 bg-green-500 rounded"></div>
                   School Information
                 </h2>
-                {selectedMajor !== "all" ? (
-                  <>
-                    <SchoolsTCAS 
-                      table={table}
-                      years={selectedYears}
-                      major={selectedMajor}
-                    />
-                    <Alert className="mt-4 bg-amber-50 border-amber-200">
-                      <AlertCircle className="h-4 w-4 text-amber-600" />
-                      <AlertDescription className="text-amber-700">
-                        School data is currently using mock data for demonstration purposes. In production, this will connect to actual school database.
-                      </AlertDescription>
-                    </Alert>
-                  </>
-                ) : (
-                  <div className="text-center p-8 border rounded-lg bg-blue-50">
-                    <School className="h-12 w-12 text-blue-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-blue-800 mb-2">
-                      Select a specific major to view school information
-                    </h3>
-                    <p className="text-blue-700">
-                      Please select a specific major from the filter above to view detailed school information
-                    </p>
-                  </div>
-                )}
+                <SchoolsTCAS table={table} title="อันดับโรงเรียน" />
               </div>
 
             </>

@@ -1,7 +1,7 @@
 // app/tcas/components/tc_schools.tsx
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/customized/select/select";
 import { Search, School, Trophy, Users, X, Info } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import { SCHOOL_RECORDS, MAJOR_RANKINGS, TCAS_ROUNDS, DATA_LABEL, type SchoolRecord } from "@/lib/schools";
+import { TCAS_ROUNDS, MAJOR_GROUPS, formatSource, type SchoolsPayload } from "@/lib/schools";
 
 type Props = {
   /** ถ้าระบุ จะล็อกให้แสดงเฉพาะรอบนั้น (ใช้ในหน้า /tcas/[table]) */
@@ -20,7 +20,7 @@ type Props = {
 type Ranked = { name: string; applicants: number; rank: number };
 
 // รวมยอดตามชื่อโรงเรียน แล้วเรียงมาก→น้อย (คะแนนเท่ากันได้อันดับเดียวกัน)
-function rankSchools(records: SchoolRecord[]): Ranked[] {
+function rankSchools(records: { name: string; applicants: number }[]): Ranked[] {
   const map = new Map<string, number>();
   records.forEach((r) => map.set(r.name, (map.get(r.name) || 0) + r.applicants));
   const sorted = [...map.entries()]
@@ -87,62 +87,111 @@ function RankList({ items, color, limit = 10, tagsOf }: { items: Ranked[]; color
 }
 
 export default function SchoolsTCAS({ table, title = "อันดับโรงเรียนที่สมัครมากที่สุด" }: Props) {
+  const [data, setData] = useState<SchoolsPayload | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [round, setRound] = useState<string>(table || "all");
   const [view, setView] = useState<"overall" | "major">("overall");
   const [search, setSearch] = useState("");
   const [majorFilter, setMajorFilter] = useState("all");
 
+  const [reloadKey, setReloadKey] = useState(0);
+
+  // setState เรียกเฉพาะใน callback ของ fetch (ไม่เรียกตรงๆ ใน body ของ effect)
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/tcas/schools")
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((d) => { if (!cancelled) setData(d); })
+      .catch((e) => { if (!cancelled) setError(e.message); });
+    return () => { cancelled = true; };
+  }, [reloadKey]);
+
+  const retry = () => {
+    setError(null);
+    setReloadKey((k) => k + 1);
+  };
+
   const activeRound = table || round;
+  const roundNo = activeRound === "all" ? null : Number(activeRound.replace("tcas_", ""));
   const color = TCAS_ROUNDS.find((r) => r.value === activeRound)?.color || "#3b82f6";
 
-  const scoped = useMemo(
-    () => SCHOOL_RECORDS.filter((r) => activeRound === "all" || r.tcas === activeRound),
-    [activeRound]
-  );
+  const sources = useMemo(() => (data?.sources ?? []).filter((x) => roundNo === null || x.round === roundNo), [data, roundNo]);
+  const applicants = useMemo(() => (data?.applicants ?? []).filter((x) => roundNo === null || x.round === roundNo), [data, roundNo]);
+  const ranks = useMemo(() => (data?.ranks ?? []).filter((x) => roundNo === null || x.round === roundNo), [data, roundNo]);
+  const allMajors = useMemo(() => data?.majors ?? [], [data]);
 
-  const majorScoped = useMemo(
-    () => MAJOR_RANKINGS.filter((m) => activeRound === "all" || m.tcas === activeRound),
-    [activeRound]
-  );
-  const majors = useMemo(() => majorScoped.map((m) => m.major), [majorScoped]);
+  // label ใต้หัวข้อ — ตามรอบที่เลือก
+  const label =
+    sources.length > 0
+      ? sources.map(formatSource).join(" · ")
+      : roundNo
+      ? `TCAS รอบ ${roundNo}`
+      : "ทุกรอบ TCAS";
+
   const majorsBySchool = useMemo(() => {
+    const names = new Map(allMajors.map((m) => [m.code, m.name.replace(/^วิชาเอก/, "")]));
     const map = new Map<string, string[]>();
-    majorScoped.forEach((m) => m.schools.forEach((n) => map.set(n, [...(map.get(n) || []), m.major])));
+    ranks.forEach((r) => {
+      const n = names.get(r.major_code);
+      if (!n) return;
+      const cur = map.get(r.name) || [];
+      if (!cur.includes(n)) map.set(r.name, [...cur, n]);
+    });
     return map;
-  }, [majorScoped]);
+  }, [ranks, allMajors]);
 
-  const ranked = useMemo(() => rankSchools(scoped), [scoped]);
+  const ranked = useMemo(() => rankSchools(applicants), [applicants]);
   const term = search.trim().toLowerCase();
   const searched = useMemo(
-    () => (term ? ranked.filter((s) => s.name.toLowerCase().includes(term)) : ranked),
+    () => (term ? ranked.filter((x) => x.name.toLowerCase().includes(term)) : ranked),
     [ranked, term]
   );
 
-  const majorGroups = useMemo(
-    () =>
-      majorScoped
-        .filter((m) => majorFilter === "all" || m.major === majorFilter)
-        .map((m) => ({
-          ...m,
-          list: m.schools
-            .map((name, i) => ({ name, order: i + 1 }))
-            .filter((x) => !term || x.name.toLowerCase().includes(term)),
-        }))
-        .filter((g) => g.list.length > 0),
-    [majorScoped, majorFilter, term]
-  );
+  // วิชาเอกครบทั้ง 12 — มีข้อมูลก็แสดง ไม่มีก็ขึ้น "ยังไม่มีข้อมูล"
+  const majorCards = useMemo(() => {
+    return allMajors
+      .filter((m) => majorFilter === "all" || m.code === majorFilter)
+      .map((m) => {
+        const lists = sources
+          .map((src) => ({
+            src,
+            items: ranks
+              .filter((r) => r.source_id === src.id && r.major_code === m.code)
+              .sort((a, b) => a.rank_order - b.rank_order)
+              .map((r) => ({ name: r.name, order: r.rank_order }))
+              .filter((x) => !term || x.name.toLowerCase().includes(term)),
+          }))
+          .filter((l) => l.items.length > 0);
+        return { ...m, lists };
+      })
+      .filter((m) => !term || m.lists.length > 0);
+  }, [allMajors, majorFilter, sources, ranks, term]);
 
-  const total = ranked.reduce((s, x) => s + x.applicants, 0);
-  const chartData = ranked.slice(0, 10).map((s) => ({
-    name: s.name.replace(/^โรงเรียน/, "").slice(0, 26),
-    full: s.name,
-    applicants: s.applicants,
-    rank: s.rank,
+  const majorsWithData = new Set(ranks.map((r) => r.major_code)).size;
+  const total = ranked.reduce((x, y) => x + y.applicants, 0);
+  const chartData = ranked.slice(0, 10).map((x) => ({
+    name: x.name.replace(/^โรงเรียน/, "").slice(0, 26),
+    full: x.name,
+    applicants: x.applicants,
+    rank: x.rank,
   }));
+
+  if (error)
+    return (
+      <Card>
+        <CardContent className="py-10 text-center space-y-3">
+          <p className="text-red-600">โหลดข้อมูลโรงเรียนไม่สำเร็จ: {error}</p>
+          <Button variant="outline" size="sm" onClick={retry}>ลองอีกครั้ง</Button>
+        </CardContent>
+      </Card>
+    );
+  if (!data)
+    return <Card><CardContent className="py-14 text-center text-muted-foreground">กำลังโหลดข้อมูลโรงเรียน...</CardContent></Card>;
+
+  const hasData = applicants.length > 0 || ranks.length > 0;
 
   return (
     <div className="space-y-6">
-      {/* หัวข้อ + ตัวเลือกมุมมอง */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
@@ -150,7 +199,7 @@ export default function SchoolsTCAS({ table, title = "อันดับโร�
             {title}
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            {DATA_LABEL} · ค้นหาโรงเรียนและดูอันดับผู้สมัคร (หน่วย: คน)
+            {label} · ค้นหาโรงเรียนและดูอันดับผู้สมัคร (หน่วย: คน)
           </p>
         </div>
         <div className="flex gap-2">
@@ -163,23 +212,16 @@ export default function SchoolsTCAS({ table, title = "อันดับโร�
         </div>
       </div>
 
-      {/* ตัวกรอง: รอบ TCAS + ค้นหา */}
       <div className="flex flex-col md:flex-row gap-3">
         {!table && (
           <div className="flex flex-wrap gap-2">
-            {[{ value: "all", label: "ทุกรอบ", color: "#111827" }, ...TCAS_ROUNDS].map((r) => {
-              const count = SCHOOL_RECORDS.filter((x) => r.value === "all" || x.tcas === r.value).length;
+            {[{ value: "all", label: "ทุกรอบ" }, ...TCAS_ROUNDS].map((r) => {
+              const n = r.value === "all" ? data.applicants.length : data.applicants.filter((x) => `tcas_${x.round}` === r.value).length;
               const active = round === r.value;
               return (
-                <Button
-                  key={r.value}
-                  size="sm"
-                  variant={active ? "default" : "outline"}
-                  onClick={() => setRound(r.value)}
-                  className="rounded-full"
-                >
+                <Button key={r.value} size="sm" variant={active ? "default" : "outline"} onClick={() => setRound(r.value)} className="rounded-full">
                   {r.label}
-                  <span className={`ml-2 text-xs ${active ? "opacity-80" : "text-muted-foreground"}`}>{count}</span>
+                  <span className={`ml-2 text-xs ${active ? "opacity-80" : "text-muted-foreground"}`}>{n}</span>
                 </Button>
               );
             })}
@@ -187,34 +229,24 @@ export default function SchoolsTCAS({ table, title = "อันดับโร�
         )}
         <div className="relative md:ml-auto md:w-80">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="ค้นหาชื่อโรงเรียน..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 pr-9"
-          />
+          <Input placeholder="ค้นหาชื่อโรงเรียน..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 pr-9" />
           {search && (
-            <button
-              onClick={() => setSearch("")}
-              className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
-              aria-label="ล้างคำค้นหา"
-            >
+            <button onClick={() => setSearch("")} className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground" aria-label="ล้างคำค้นหา">
               <X className="h-4 w-4" />
             </button>
           )}
         </div>
       </div>
 
-      {scoped.length === 0 ? (
+      {!hasData && view === "overall" ? (
         <Card>
           <CardContent className="py-14 text-center text-muted-foreground">
             <School className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-            ยังไม่มีข้อมูลโรงเรียนของรอบนี้
+            ยังไม่มีข้อมูลโรงเรียนของ {roundNo ? `TCAS รอบ ${roundNo}` : "รอบนี้"}
           </CardContent>
         </Card>
-      ) : (
+      ) : view === "overall" ? (
         <>
-          {/* สรุปตัวเลข */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Card className="border-l-4" style={{ borderLeftColor: color }}>
               <CardContent className="pt-6">
@@ -237,99 +269,111 @@ export default function SchoolsTCAS({ table, title = "อันดับโร�
             </Card>
           </div>
 
-          {view === "overall" ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* กราฟ Top 10 */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Top 10 โรงเรียน</CardTitle>
-                  <CardDescription>เรียงจากจำนวนผู้สมัครสูงสุด</CardDescription>
-                </CardHeader>
-                <CardContent style={{ height: Math.max(260, chartData.length * 38) }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData} layout="vertical" margin={{ left: 0, right: 24 }}>
-                      <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                      <XAxis type="number" allowDecimals={false} />
-                      <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 11 }} interval={0} />
-                      <Tooltip
-                        formatter={(v) => [`${Number(v).toLocaleString()} คน`, "ผู้สมัคร"]}
-                        labelFormatter={(_, p) => p?.[0]?.payload?.full ?? ""}
-                      />
-                      <Bar dataKey="applicants" radius={[0, 4, 4, 0]} maxBarSize={24}>
-                        {chartData.map((d) => (
-                          <Cell key={d.full} fill={color} fillOpacity={d.rank <= 3 ? 1 : 0.5} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Top 10 โรงเรียน</CardTitle>
+                <CardDescription>เรียงจากจำนวนผู้สมัครสูงสุด</CardDescription>
+              </CardHeader>
+              <CardContent style={{ height: Math.max(260, chartData.length * 38) }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData} layout="vertical" margin={{ left: 0, right: 24 }}>
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                    <XAxis type="number" allowDecimals={false} />
+                    <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 11 }} interval={0} />
+                    <Tooltip
+                      formatter={(v) => [`${Number(v).toLocaleString()} คน`, "ผู้สมัคร"]}
+                      labelFormatter={(_, p) => p?.[0]?.payload?.full ?? ""}
+                    />
+                    <Bar dataKey="applicants" radius={[0, 4, 4, 0]} maxBarSize={24}>
+                      {chartData.map((d) => <Cell key={d.full} fill={color} fillOpacity={d.rank <= 3 ? 1 : 0.5} />)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
 
-              {/* รายชื่อ + ค้นหา */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">รายชื่อโรงเรียนทั้งหมด</CardTitle>
-                  <CardDescription>
-                    {term ? `พบ ${searched.length} จาก ${ranked.length} โรงเรียน` : `${ranked.length} โรงเรียน เรียงตามจำนวนผู้สมัคร`}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {searched.length > 0 ? (
-                    <RankList items={searched} color={color} limit={searched.length > 10 && !term ? 10 : 100} tagsOf={(n) => majorsBySchool.get(n) || []} />
-                  ) : (
-                    <p className="py-10 text-center text-muted-foreground">ไม่พบโรงเรียนที่ตรงกับ “{search}”</p>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
-                <Info className="h-5 w-5 shrink-0 mt-0.5" />
-                <p>
-                  {DATA_LABEL} — เอกสารระบุเฉพาะรายชื่อโรงเรียนที่มีผู้สมัครสูงสุดของแต่ละสาขา
-                  (ไม่มีจำนวนผู้สมัครแยกสาขา) จึงแสดงเป็นรายชื่อเรียงตามลำดับในเอกสาร
-                </p>
-              </div>
-              {majors.length > 1 && (
-                <div className="w-full md:w-96">
-                  <Select value={majorFilter} onValueChange={setMajorFilter}>
-                    <SelectTrigger><SelectValue placeholder="เลือกสาขา" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">ทุกสาขา</SelectItem>
-                      {majors.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {majorGroups.map((g) => (
-                  <Card key={g.major}>
-                    <CardHeader>
-                      <div className="flex items-start justify-between gap-3">
-                        <CardTitle className="text-base">วิชาเอก{g.major}</CardTitle>
-                        <Badge variant="outline" className="whitespace-nowrap">{g.list.length} โรงเรียน</Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <ol className="divide-y">
-                        {g.list.map((x) => (
-                          <li key={x.name} className="flex items-center gap-3 py-2 text-sm">
-                            <span className="w-7 h-7 shrink-0 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ backgroundColor: color }}>{x.order}</span>
-                            <span className="truncate" title={x.name}>{x.name}</span>
-                          </li>
-                        ))}
-                      </ol>
-                    </CardContent>
-                  </Card>
-                ))}
-                {majorGroups.length === 0 && (
-                  <p className="py-10 text-center text-muted-foreground lg:col-span-2">ไม่พบรายการ{search ? ` ที่ตรงกับ “${search}”` : ""}</p>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">รายชื่อโรงเรียนทั้งหมด</CardTitle>
+                <CardDescription>
+                  {term ? `พบ ${searched.length} จาก ${ranked.length} โรงเรียน` : `${ranked.length} โรงเรียน เรียงตามจำนวนผู้สมัคร`}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {searched.length > 0 ? (
+                  <RankList items={searched} color={color} limit={searched.length > 10 && !term ? 10 : 100} tagsOf={(n) => majorsBySchool.get(n) || []} />
+                ) : (
+                  <p className="py-10 text-center text-muted-foreground">ไม่พบโรงเรียนที่ตรงกับ “{search}”</p>
                 )}
-              </div>
-            </div>
-          )}
+              </CardContent>
+            </Card>
+          </div>
         </>
+      ) : (
+        <div className="space-y-6">
+          <div className="flex gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+            <Info className="h-5 w-5 shrink-0 mt-0.5" />
+            <p>
+              {label} — เอกสารระบุเฉพาะรายชื่อโรงเรียนที่มีผู้สมัครสูงสุดของแต่ละวิชาเอก (ไม่มีจำนวนแยกสาขา)
+              จึงแสดงตามลำดับในเอกสาร · มีข้อมูล {majorsWithData} จาก {allMajors.length} วิชาเอก
+            </p>
+          </div>
+          <div className="w-full md:w-96">
+            <Select value={majorFilter} onValueChange={setMajorFilter}>
+              <SelectTrigger><SelectValue placeholder="เลือกวิชาเอก" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">ทุกวิชาเอก ({allMajors.length})</SelectItem>
+                {allMajors.map((m) => <SelectItem key={m.code} value={m.code}>{m.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          {majorCards.length === 0 && (
+            <p className="py-10 text-center text-muted-foreground">ไม่พบโรงเรียนที่ตรงกับ “{search}”</p>
+          )}
+          {MAJOR_GROUPS.map((g) => {
+            const cards = majorCards.filter((m) => m.code.startsWith(g.prefix));
+            if (cards.length === 0) return null;
+            return (
+              <section key={g.prefix} className="space-y-3">
+                <h3 className="text-sm font-semibold text-muted-foreground">{g.name}</h3>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {cards.map((m) => (
+                    <Card key={m.code} className={m.lists.length === 0 ? "border-dashed bg-gray-50/60" : ""}>
+                      <CardHeader>
+                        <div className="flex items-start justify-between gap-3">
+                          <CardTitle className="text-base">{m.name}</CardTitle>
+                          <Badge variant={m.lists.length ? "outline" : "secondary"} className="whitespace-nowrap font-normal">
+                            {m.lists.length ? `${m.lists.reduce((x, l) => x + l.items.length, 0)} โรงเรียน` : "ยังไม่มีข้อมูล"}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        {m.lists.length === 0 ? (
+                          <p className="py-4 text-sm text-muted-foreground">ยังไม่มีข้อมูลโรงเรียนของวิชาเอกนี้</p>
+                        ) : (
+                          m.lists.map((l) => (
+                            <div key={l.src.id}>
+                              {sources.length > 1 && <p className="text-xs text-muted-foreground mb-1">{formatSource(l.src)}</p>}
+                              <ol className="divide-y">
+                                {l.items.map((x) => (
+                                  <li key={x.name} className="flex items-center gap-3 py-2 text-sm">
+                                    <span className="w-7 h-7 shrink-0 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ backgroundColor: color }}>{x.order}</span>
+                                    <span className="truncate" title={x.name}>{x.name}</span>
+                                  </li>
+                                ))}
+                              </ol>
+                            </div>
+                          ))
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </section>
+            );
+          })}
+        </div>
       )}
     </div>
   );

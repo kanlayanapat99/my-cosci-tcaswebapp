@@ -1,29 +1,6 @@
 // lib/schools.ts
-// ข้อมูลจำนวนผู้สมัครแยกตามโรงเรียน (เบื้องต้นจากไฟล์ TCAS1 – หน่วย: คน)
-// เมื่อมีข้อมูลเพิ่ม ให้เพิ่มแถวในอาร์เรย์นี้ได้เลย
-// ที่มา: เอกสารประชุม "รายชื่อโรงเรียนที่มีผู้สมัครสูงสุด TCAS รอบที่ 1.1 (แฟ้มสะสมผลงาน) ปีการศึกษา 2570"
-//  - SCHOOL_RECORDS : จำนวนผู้สมัครรวมทุกสาขา ต่อโรงเรียน
-//  - MAJOR_RANKINGS : โรงเรียนที่มีผู้สมัครสูงสุดของแต่ละสาขา (เอกสารไม่ได้ระบุจำนวน จึงเก็บเป็นรายชื่อเรียงลำดับ)
-
-export type SchoolRecord = {
-  tcas: "tcas_1" | "tcas_2" | "tcas_3" | "tcas_4";
-  name: string;
-  applicants: number;
-  year?: string;
-};
-
-export type MajorRanking = {
-  tcas: SchoolRecord["tcas"];
-  major: string;
-  schools: string[]; // เรียงตามลำดับในเอกสาร
-};
-
-export const DATA_LABEL = "TCAS รอบ 1.1 (แฟ้มสะสมผลงาน) ปีการศึกษา 2570";
-
-const SWU = "โรงเรียนสาธิตมหาวิทยาลัยศรีนครินทรวิโรฒ ประสานมิตร (ฝ่ายมัธยม)";
-const OPEN = "ศูนย์การเรียนโอเพ่นสคูล (กรุงเทพฯ)";
-const GABRIEL = "โรงเรียนเซนต์คาเบรียล";
-const SURAT = "โรงเรียนสุราษฎร์พิทยา (สุราษฎร์ธานี)";
+// ชนิดข้อมูล + ค่าคงที่ของส่วน "โรงเรียน"
+// ข้อมูลจริงอยู่ในฐานข้อมูล (ดู sql/schools.sql และ /api/tcas/schools)
 
 export const TCAS_ROUNDS = [
   { value: "tcas_1", label: "TCAS 1", color: "#3b82f6" },
@@ -32,32 +9,22 @@ export const TCAS_ROUNDS = [
   { value: "tcas_4", label: "TCAS 4", color: "#8b5cf6" },
 ] as const;
 
-const t1 = (name: string, applicants: number): SchoolRecord => ({ tcas: "tcas_1", year: "2570", name, applicants });
+export type ApiMajor = { code: string; name: string };
+export type ApiSource = { id: number; round: number; year: string; label: string };
+export type ApiApplicant = { source_id: number; round: number; year: string; name: string; applicants: number };
+export type ApiRank = { source_id: number; round: number; major_code: string; name: string; rank_order: number };
+export type SchoolsPayload = {
+  majors: ApiMajor[];
+  sources: ApiSource[];
+  applicants: ApiApplicant[];
+  ranks: ApiRank[];
+};
 
-export const SCHOOL_RECORDS: SchoolRecord[] = [
-  t1(SWU, 73),
-  t1("โรงเรียนบดินทรเดชา (สิงห์ สิงหเสนี)", 16),
-  t1(SURAT, 16),
-  t1(GABRIEL, 15),
-  t1(OPEN, 14),
-  t1("โรงเรียนปริ้นส์รอยแยลส์วิทยาลัย (เชียงใหม่)", 13),
-  t1("โรงเรียนอัสสัมชัญธนบุรี", 13),
-  t1("โรงเรียนกรุงเทพคริสเตียนวิทยาลัย", 12),
-  t1("โรงเรียนพระหฤทัยคอนแวนต์", 12),
-  t1("โรงเรียนอัสสัมชัญสมุทรปราการ", 11),
-  t1("โรงเรียนเซนต์โยเซฟคอนเวนต์", 10),
-  t1("โรงเรียนเตรียมอุดมศึกษาพัฒนาการ", 10),
-  t1("โรงเรียนสาธิตสถาบันการจัดการปัญญาภิวัฒน์ (นนทบุรี)", 8),
-  t1("โรงเรียนราชินี", 8),
-  t1("โรงเรียนสิรินธรราชวิทยาลัย (นครปฐม)", 7),
-  t1("โรงเรียนอำมาตย์พานิชนุกูล (กระบี่)", 7),
-];
+// จัดกลุ่มวิชาเอกตามตัวอักษรหน้ารหัส (C01.., I01.., M01..)
+export const MAJOR_GROUPS = [
+  { prefix: "C", name: "กลุ่มภาพยนตร์และสื่อดิจิทัล" },
+  { prefix: "I", name: "กลุ่มสื่อปฏิสัมพันธ์และนวัตกรรมคอมพิวเตอร์" },
+  { prefix: "M", name: "กลุ่มการสื่อสาร" },
+] as const;
 
-// หมายเหตุ: สาขาที่ 5 ในภาพถูกตัดท้าย (เห็นแค่ 2 โรงเรียนแรก) — เมื่อได้ภาพส่วนที่เหลือ ให้เติมต่อที่นี่
-export const MAJOR_RANKINGS: MajorRanking[] = [
-  { tcas: "tcas_1", major: "การออกแบบสื่อปฏิสัมพันธ์และมัลติมีเดีย", schools: [SWU, "โรงเรียนโพธิสารพิทยากร (กรุงเทพฯ)", "โรงเรียนสตรีวิทยา 2"] },
-  { tcas: "tcas_1", major: "การจัดการธุรกิจไซเบอร์", schools: [SWU, "โรงเรียนมารีวิทย์ (ชลบุรี)", "โรงเรียนวัดเขมาภิรตาราม (นนทบุรี)"] },
-  { tcas: "tcas_1", major: "นวัตกรรมคอมพิวเตอร์เพื่อการสื่อสาร", schools: ["โรงเรียนสาธิตมหาวิทยาลัยรามคำแหง (ฝ่ายมัธยม)", "โรงเรียนสายน้ำผึ้งในพระอุปถัมภ์ฯ"] },
-  { tcas: "tcas_1", major: "การผลิตภาพยนตร์และสื่อดิจิทัล", schools: [SWU, OPEN, GABRIEL] },
-  { tcas: "tcas_1", major: "การแสดงและกำกับการแสดงภาพยนตร์", schools: [SWU, SURAT] },
-];
+export const formatSource = (s: ApiSource) => `TCAS ${s.label} ปีการศึกษา ${s.year}`;

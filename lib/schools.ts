@@ -22,9 +22,9 @@ export type SchoolsPayload = {
 
 // จัดกลุ่มวิชาเอกตามตัวอักษรหน้ารหัส (C01.., I01.., M01..)
 export const MAJOR_GROUPS = [
-  { prefix: "C", name: "กลุ่มภาพยนตร์และสื่อดิจิทัล" },
-  { prefix: "I", name: "กลุ่มสื่อปฏิสัมพันธ์และนวัตกรรมคอมพิวเตอร์" },
-  { prefix: "M", name: "กลุ่มการสื่อสาร" },
+  { prefix: "C", name: "กลุ่มสาขาภาพยนตร์และสื่อดิจิทัล" },
+  { prefix: "I", name: "กลุ่มสาขาวิชานวัตกรรมสื่อสารสังคม" },
+  { prefix: "M", name: "กลุ่มสาขานวัตกรรมการสื่อสาร" },
 ] as const;
 
 export const formatSource = (s: ApiSource) => `TCAS ${s.label} ปีการศึกษา ${s.year}`;

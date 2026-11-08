@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/customized/select/select";
-import { Search, School, Trophy, Users, X, Info } from "lucide-react";
+import { Search, School, Trophy, Users, X } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { TCAS_ROUNDS, MAJOR_GROUPS, formatSource, type SchoolsPayload } from "@/lib/schools";
 
@@ -312,13 +312,6 @@ export default function SchoolsTCAS({ table, title = "อันดับโร�
         </>
       ) : (
         <div className="space-y-6">
-          <div className="flex gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
-            <Info className="h-5 w-5 shrink-0 mt-0.5" />
-            <p>
-              {label} — เอกสารระบุเฉพาะรายชื่อโรงเรียนที่มีผู้สมัครสูงสุดของแต่ละวิชาเอก (ไม่มีจำนวนแยกสาขา)
-              จึงแสดงตามลำดับในเอกสาร · มีข้อมูล {majorsWithData} จาก {allMajors.length} วิชาเอก
-            </p>
-          </div>
           <div className="w-full md:w-96">
             <Select value={majorFilter} onValueChange={setMajorFilter}>
               <SelectTrigger><SelectValue placeholder="เลือกวิชาเอก" /></SelectTrigger>
